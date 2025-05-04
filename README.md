@@ -12,14 +12,14 @@ The zip file will contain 3 files. MVSI.asi, MVSI.ini, and dsound.dll. You need 
 
 ### All Ini Settings
 ```ini
-    [Debug]
+    [Settings.Debug]
     bEnableConsoleWindow = false
     bPauseOnStart = false
     bDebug = false
 
     [Settings]
     iLogSize = 100
-    iLogLevel = 19
+    iLogLevel = 10
 
     [Patches.AntiCheat]
     bDisableSignatureCheck = true
