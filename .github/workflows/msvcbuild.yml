@@ -1,0 +1,84 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+    - "**.cpp" # Only when code changes
+    - "**.h"
+  workflow_dispatch: # Allow manual runs
+
+jobs:
+  build:
+    runs-on: windows-2019
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+      with:
+        submodules: 'true'
+        # token: ${{ secrets.GITHUB_TOKEN }} # Removed since the repos it checks out are public
+
+    - name: Set up MSVC environment
+      uses: microsoft/setup-msbuild@v1
+
+    - name: Build MVSI
+      run: msbuild MVSASI.sln /p:Configuration=Release /p:Platform=x64
+      working-directory: ${{ github.workspace }}
+
+    - name: Get current version
+      id: version
+      run: |
+        $VERSION=Select-String -Path .\source\dllmain.cpp -Pattern "constexpr .* CURRENT_HOOK_VERSION ?="
+        $VERSION=[regex]::Match($VERSION, '\d+(\.\d+){1,}').Value
+        echo "current_version=$VERSION" >> $env:GITHUB_OUTPUT
+        echo "project_name=MVSI" >> $env:GITHUB_OUTPUT
+        echo "Project Version is $VERSION"
+
+    # Download dsound from MK1ProxyDll
+    # - name: Download Latest dsound.dll # Can be changed later to retrieve from file
+    #   id: loader_downloader
+    #   run: |
+    #     Invoke-RestMethod -Uri "https://api.github.com/repos/thethiny/MK1ProxyDll/releases/latest" | 
+    #     Select-Object -ExpandProperty assets | 
+    #     ForEach-Object {Invoke-WebRequest -Uri $_.browser_download_url -OutFile $_.name}
+
+    - name: Download ASI Loader dsound.dll # Can be changed later to retrieve from file
+      id: loader_downloader
+      run: |
+        Invoke-RestMethod -Uri "https://api.github.com/repos/ermaccer/MK1Hook/releases/latest" | 
+        Select-Object -ExpandProperty assets | 
+        ForEach-Object { 
+          Invoke-WebRequest -Uri $_.browser_download_url -OutFile $_.name
+          Expand-Archive -Path $_.name -DestinationPath .
+        }
+
+    - name: Create Release Zip
+      id: zip
+      run: |
+        $name = "${{ env.PROJECT_NAME }}"
+        $version = "${{ env.PROJECT_VERSION }}"
+        $versionedName = "${name}_v${version}"
+        echo "Packing $name files into `"$versionedName.zip`""
+        mv .\source\sample.ini .\${name}.ini
+        Compress-Archive -Path .\${name}.ini, .\out\Release\Binaries\${name}.asi, dsound.dll -DestinationPath "${versionedName}.zip"
+        echo "bundle_file=${versionedName}.zip" >> $env:GITHUB_OUTPUT
+      env:
+        PROJECT_NAME: ${{ steps.version.outputs.project_name }}
+        PROJECT_VERSION: ${{ steps.version.outputs.current_version }}
+
+    - name: Create GitHub Release
+      id: create_release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: ./${{ env.RELEASE_FILE }}
+        name: ${{env.PROJECT_NAME}} Version ${{ env.PROJECT_VERSION }}
+        tag_name: v${{ env.PROJECT_VERSION }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        PROJECT_NAME: ${{ steps.version.outputs.project_name }}
+        PROJECT_VERSION: ${{ steps.version.outputs.current_version }}
+        RELEASE_FILE: ${{ steps.zip.outputs.bundle_file }}
