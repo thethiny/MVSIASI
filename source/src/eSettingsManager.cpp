@@ -49,6 +49,7 @@ void eSettingsManager::Init()
 	// Patterns
 	pSigCheck					= ini.ReadString	("Patterns",			"pSigCheck",				"");
 	pEndpointLoader				= ini.ReadString	("Patterns",			"pEndpointLoader",			"");
+	pProdEndpointLoader			= ini.ReadString	("Patterns",			"pWBEndpointLoader",		"");
 
 
 	// Keybinds
@@ -59,4 +60,6 @@ void eSettingsManager::Init()
 	// Private Server
 	szServerUrl					= ini.ReadString	("Server",				"szServerUrl",				"");
 	bEnableServerProxy			= ini.ReadBoolean	("Server",				"bEnableServerProxy",		false);
+	szProdServerUrl				= ini.ReadString	("Server.Prod",			"szProdServerUrl",			"");
+	bEnableProdServerProxy		= ini.ReadBoolean	("Server.Prod",			"bEnableProdServerProxy",		false);
 }

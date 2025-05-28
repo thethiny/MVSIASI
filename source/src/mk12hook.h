@@ -11,11 +11,13 @@ namespace MK12Hook {
 		MK12::FName*							__fastcall	ReadFNameToWStr(MK12::FName&, char*);
 		HANDLE									__stdcall	CreateFile(LPCWSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes, HANDLE hTemplateFile);
 		const char**							__fastcall	OverrideGameEndpoint(int64_t*, const char*);
+		int64_t*								__fastcall	OverrideProdEndpoint(int64_t*, const wchar_t*);
 	};
 
 	namespace Hooks {
 		bool DisableSignatureCheck(Trampoline*);
 		bool OverrideGameEndpointsData(Trampoline*);
+		bool OverrideProdEndpointsData(Trampoline*);
 	};
 }
 
@@ -23,6 +25,7 @@ namespace HookMetadata { //Namespace for helpers for game functions
 	struct ActiveMods {
 		bool bAntiSigCheck		= false;
 		bool bGameEndpointSwap	= false;
+		bool bProdEndpointSwap    = false;
 	};
 
 	struct LibMapsStruct {

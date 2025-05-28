@@ -32,6 +32,33 @@ namespace MK12Hook::Proxies {
 		return CreateFileW(lpFileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
 	}
 
+	int64_t* OverrideProdEndpoint(int64_t* FStringPtr, const wchar_t* EndpointUrl)
+	{
+		CPPython::string ServerUrl = SettingsMgr->szProdServerUrl;
+
+		if (HookMetadata::sActiveMods.bProdEndpointSwap && !ServerUrl.empty())
+		{
+			ServerUrl = ServerUrl.strip("/") + "/";
+
+			int StringLength = (ServerUrl.size() + 1) * 2;
+			std::wstring wServerUrl = std::wstring(ServerUrl.begin(), ServerUrl.end());
+
+			wprintf(L"Rerouting traffic from Prod Server \"%s\" to \"%s\"!\n", EndpointUrl, wServerUrl.c_str());
+
+			const wchar_t* end = wServerUrl.c_str();
+
+			MK12::SetFStringValue(FStringPtr, end);
+
+		}
+		else
+		{
+			MK12::SetFStringValue(FStringPtr, EndpointUrl);
+		}
+
+		return FStringPtr;
+
+	}
+
 	const char** OverrideGameEndpoint(int64_t* TargetStringDest, const char * EndpointAddress)
 	{
 		CPPython::string ServerUrl = SettingsMgr->szServerUrl;
@@ -43,7 +70,7 @@ namespace MK12Hook::Proxies {
 			int StringLength = (ServerUrl.size() + 1) * 2;
 			std::wstring wServerUrl = std::wstring(ServerUrl.begin(), ServerUrl.end());
 
-			wprintf(L"Rerouting traffic from MultiVersus server \"%llx\" to \"%s\"!\n", (int64_t)EndpointAddress, wServerUrl.c_str());
+			wprintf(L"Rerouting traffic from MVS server \"%llx\" to \"%s\"!\n", (int64_t)EndpointAddress, wServerUrl.c_str());
 
 			const char* end = ServerUrl.c_str();
 
@@ -201,6 +228,35 @@ namespace MK12Hook::Hooks {
 		return true;
 	}
 
+	bool OverrideProdEndpointsData(Trampoline* GameTramp)
+	{
+		printf("\n==OverrideGameEndpointsData==\n");
+		std::string pattern = SettingsMgr->pProdEndpointLoader;
+		if (pattern.empty())
+		{
+			printfError("pProdEndpointLoader Not Specified. Please Add Pattern to ini file!");
+			return false;
+		}
+
+		if (SettingsMgr->szProdServerUrl.empty())
+		{
+			printfWarning("Prod Server Url is empty or not specified. Skipping!");
+			return false;
+		}
+
+		uint64_t* lpPattern = FindPattern(GetModuleHandleA(NULL), pattern);
+		if (!lpPattern)
+		{
+			printfError("Couldn't find ProdEndpointLoader Pattern");
+			return false;
+		}
+
+		uint64_t call_address = ((uint64_t)lpPattern) + 0x0A;
+		if (SettingsMgr->iLogLevel)
+			printf("ProdEndpointLoader Pattern Found at: %p\n", lpPattern);
+
+		MakeProxyFromOpCode(GameTramp, call_address, (uint8_t)4, MK12Hook::Proxies::OverrideProdEndpoint, &MK12::SetFStringValue, PATCH_CALL);
+	}
 
 	bool OverrideGameEndpointsData(Trampoline* GameTramp)
 	{

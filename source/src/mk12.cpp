@@ -4,6 +4,7 @@
 
 // Game Functions
 MK12::GetEndpointKeyValueType*			MK12::GetEndpointKeyValue			= nullptr;
+MK12::SetFStringValueType*				MK12::SetFStringValue				= nullptr;
 
 namespace MK12::FNameFunc {
 	inline uint16_t GetSize(FName& F)

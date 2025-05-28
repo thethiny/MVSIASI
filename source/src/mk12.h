@@ -145,6 +145,7 @@ namespace MK12 { // Namespace for game functions / structs
 	//typedef			__int64							(__fastcall	InitializeNameTableType)			(UNameTableStruct&);
 	// JSONEndpoint
 	typedef			const char**					(__fastcall	GetEndpointKeyValueType)			(int64_t*, const char*);
+	typedef			int64_t*						(__fastcall	SetFStringValueType)				(int64_t*, const wchar_t*);
 
 	// ReCreated
 	namespace Remake {
@@ -166,5 +167,6 @@ namespace MK12 { // Namespace for game functions / structs
 	//extern uint64_t*									ReadFNameToWStrCommonStart;
 
 	extern GetEndpointKeyValueType*						GetEndpointKeyValue;
+	extern SetFStringValueType*							SetFStringValue;
 
 }

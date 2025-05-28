@@ -43,6 +43,7 @@ public:
 	//std::string pFPath2LoadPat;
 	//std::string pFPathCLoadPat;
 	std::string pEndpointLoader;
+	std::string pProdEndpointLoader;
 
 
 	// Menu Section
@@ -65,6 +66,9 @@ public:
 	//Private Server
 	std::string szServerUrl;
 	bool bEnableServerProxy;
+	// WB
+	std::string szProdServerUrl;
+	bool bEnableProdServerProxy;
 
 };
 

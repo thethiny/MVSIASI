@@ -62,6 +62,10 @@ void PreGameHooks()
 	{
 		HookMetadata::sActiveMods.bGameEndpointSwap		= MK12Hook::Hooks::OverrideGameEndpointsData(GameTramp);
 	}
+	if (SettingsMgr->bEnableProdServerProxy)
+	{
+		HookMetadata::sActiveMods.bProdEndpointSwap		= MK12Hook::Hooks::OverrideProdEndpointsData(GameTramp);
+	}
 	
 }
 
