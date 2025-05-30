@@ -1,9 +1,8 @@
 #pragma once
 #include <cppython.h>
 #include <map>
-#include "mk12_enums.h"
 
-namespace MK12 { // Namespace for game functions / structs
+namespace MVSGame { // Namespace for game functions / structs
 
 	// Structs
 	struct FName {
@@ -139,13 +138,12 @@ namespace MK12 { // Namespace for game functions / structs
 	FName* NameTableIndexToFName(uint16_t NameTableId, uint16_t NameOffset);
 
 	// Game Functions
-	// FString
-	//typedef			__int64							(__fastcall ReadFStringType)					(__int64, __int64);
-	//typedef			void							(__fastcall FNameToWStrType)					(FName&, char*);
-	//typedef			__int64							(__fastcall	InitializeNameTableType)			(UNameTableStruct&);
 	// JSONEndpoint
 	typedef			const char**					(__fastcall	GetEndpointKeyValueType)			(int64_t*, const char*);
 	typedef			int64_t*						(__fastcall	SetFStringValueType)				(int64_t*, const wchar_t*);
+	typedef			void							(__fastcall FDateTimeType)						(uint64_t*, int, int, int, int, int, int, int);
+	typedef			void							(__fastcall InitThreadHeaderType)				(int32_t*);
+	typedef			int								(__fastcall InitThreadFooterType)				(int32_t*);
 
 	// ReCreated
 	namespace Remake {
@@ -168,5 +166,8 @@ namespace MK12 { // Namespace for game functions / structs
 
 	extern GetEndpointKeyValueType*						GetEndpointKeyValue;
 	extern SetFStringValueType*							SetFStringValue;
-
+	extern FDateTimeType*								FDateTime;
+	extern InitThreadHeaderType*						Init_thread_header;
+	extern InitThreadFooterType*						Init_thread_footer;
+	extern uint64_t*									kSunsetDate;
 }

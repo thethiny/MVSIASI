@@ -20,30 +20,16 @@ public:
 
 
 	// Toggles
+	bool bSunsetDate;
 	bool bDisableSignatureCheck;
-	//bool bDisableSignatureWarn;
-	//bool bDisableTOCSigCheck;
-	//bool bDisableChunkSigCheck;
-	//bool bDisablePakTOCCheck;
-	//bool bPatchCurl;
-	//bool bFNameToStrHook;
-	//bool bUNameGetter;
 
 	// Addresses
 
 	// Patterns
 	std::string pSigCheck;
-	//std::string pSigWarn;
-	//std::string pTocCheck;
-	//std::string pPakTocCheck;
-	//std::string pChunkSigCheck;
-	//std::string pChunkSigCheckFunc;
-	//std::string pUNameObjGetPat;
-	//std::string pFPathLoadPat;
-	//std::string pFPath2LoadPat;
-	//std::string pFPathCLoadPat;
 	std::string pEndpointLoader;
 	std::string pProdEndpointLoader;
+	std::string pSunsetDate;
 
 
 	// Menu Section

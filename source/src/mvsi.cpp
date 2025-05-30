@@ -1,12 +1,13 @@
-#include "mk12hook.h"
+#include "mvsi.h"
 
 
 HookMetadata::ActiveMods			HookMetadata::sActiveMods;
 HookMetadata::LibMapsStruct			HookMetadata::sLFS;
+bool MVSI::IsMVSIUpdateRequired = false;
 
 
 
-namespace MK12Hook::Proxies {
+namespace MVSI::Proxies {
 
 	HANDLE __stdcall CreateFile(LPCWSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes, HANDLE hTemplateFile)
 	{
@@ -22,7 +23,7 @@ namespace MK12Hook::Proxies {
 		//		if (std::filesystem::exists(newFileName.c_str()))
 		//		{
 		//			wprintf(L"Loading %s from %s\n", wcFileName, wsSwapFolder.c_str());
-		//			MK12::vSwappedFiles.push_back(wcFileName);
+		//			MVSGame::vSwappedFiles.push_back(wcFileName);
 		//			return CreateFileW(newFileName.c_str(), dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
 		//		}
 		//	}
@@ -30,6 +31,23 @@ namespace MK12Hook::Proxies {
 		//}
 
 		return CreateFileW(lpFileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
+	}
+
+
+
+	bool MVSIOfflineModeChecker(int32_t* _TSS0_395)
+	{
+		MVSGame::Init_thread_header(_TSS0_395);
+		if (_TSS0_395[0] == -1) // This portion will only be called once
+		{
+			// Check for updates
+			//MVSGame::FDateTime(MVSGame::kSunsetDate, 2025, 6, 1, 0, 0, 0, 0); // No longer needed
+			MVSI::IsMVSIUpdateRequired = false;
+
+			MVSGame::Init_thread_footer(_TSS0_395);
+		}
+		
+		return MVSI::IsMVSIUpdateRequired; // Other checks can also be placed here
 	}
 
 	int64_t* OverrideProdEndpoint(int64_t* FStringPtr, const wchar_t* EndpointUrl)
@@ -47,12 +65,12 @@ namespace MK12Hook::Proxies {
 
 			const wchar_t* end = wServerUrl.c_str();
 
-			MK12::SetFStringValue(FStringPtr, end);
+			MVSGame::SetFStringValue(FStringPtr, end);
 
 		}
 		else
 		{
-			MK12::SetFStringValue(FStringPtr, EndpointUrl);
+			MVSGame::SetFStringValue(FStringPtr, EndpointUrl);
 		}
 
 		return FStringPtr;
@@ -74,7 +92,7 @@ namespace MK12Hook::Proxies {
 
 			const char* end = ServerUrl.c_str();
 
-			MK12::GetEndpointKeyValue(TargetStringDest, end);
+			MVSGame::GetEndpointKeyValue(TargetStringDest, end);
 			return (const char**)TargetStringDest;
 
 			//obj.ValuePointer = new wchar_t[StringLength];
@@ -83,11 +101,11 @@ namespace MK12Hook::Proxies {
 			//obj.ValueLength = ServerUrl.size() + 1; // Characters count in str and not wstr
 			//obj.ValueLength8BAligned = (obj.ValueLength + 7) & (~7);
 
-			//MK12::GetEndpointKeyValue(obj, EndpointAddress);
+			//MVSGame::GetEndpointKeyValue(obj, EndpointAddress);
 			//return &obj.ValuePointer;
 		}
 
-		return MK12::GetEndpointKeyValue(TargetStringDest, EndpointAddress);
+		return MVSGame::GetEndpointKeyValue(TargetStringDest, EndpointAddress);
 
 	}
 };
@@ -182,7 +200,7 @@ ArgTypes GetArgType(const char* arg_type)
 }
 
 // Hooks
-namespace MK12Hook::Hooks {
+namespace MVSI::Hooks {
 	using namespace Memory::VP;
 	using namespace hook;
 
@@ -228,6 +246,70 @@ namespace MK12Hook::Hooks {
 		return true;
 	}
 
+	bool PatchSunsetSetterIntoMVSIChecker(Trampoline* GameTramp)
+	{
+		printf("\n==Override Sunset Function==\n");
+		std::string pattern = SettingsMgr->pSunsetDate;
+		if (pattern.empty())
+		{
+			printfError("pSunsetDate Not Specified. Please Add Pattern to ini file!");
+			return false;
+		}
+
+		uint64_t* lpPattern = FindPattern(GetModuleHandleA(NULL), pattern);
+		if (!lpPattern)
+		{
+			printfError("Couldn't find SunsetDate Pattern");
+			return false;
+		}
+
+		uint64_t call_address = ((uint64_t)lpPattern);
+		if (SettingsMgr->iLogLevel)
+			printf("SunsetDate Pattern Found at: %p\n", lpPattern);
+
+		MakeProxyFromOpCode(GameTramp, call_address + 7, (uint8_t)4, MVSI::Proxies::MVSIOfflineModeChecker, &MVSGame::Init_thread_header, PATCH_CALL);
+		GetProcFromOpCode(call_address + 0x47, 4, &MVSGame::Init_thread_footer);
+		GetProcFromOpCode(call_address + 0x3B, 4, &MVSGame::FDateTime);
+		MVSGame::kSunsetDate = (uint64_t*) GetDestinationFromOpCode(call_address + 0x19, 3, 7, 4);
+		
+		uint64_t final_bool_offset = call_address - 0x2F;
+		Memory::VP::InjectHook(final_bool_offset, GameTramp->Jump(MVSI::Proxies::MVSIOfflineModeChecker), PATCH_CALL);
+		Patch<uint16_t>(final_bool_offset + 0x5, 0x10EB);
+
+		if (SettingsMgr->iLogLevel)
+		{
+			printf("Init_thread_header Function Found at: %p\n", MVSGame::Init_thread_header);
+			printf("Init_thread_footer Function Found at: %p\n", MVSGame::Init_thread_footer);
+			printf("FDateTime Function Found at: %p\n", MVSGame::FDateTime);
+			printf("SunsetDate Object Found at: %p\n", MVSGame::kSunsetDate);
+		}
+				
+		// Jump to the cleanup function
+		Patch<uint16_t>(call_address + 0xC, 0xDAEB);
+		
+		// Nop the addresses
+		uint64_t nop_loc = call_address + 0xE;
+		for (int i = 0; i < int(0x40 / 9) - 1; i++) // 7 times
+		{
+			Patch<uint64_t>(nop_loc, 0x841F0F66);
+			//Patch<uint8_t>(nop_loc + 8, 0); // Unneeded
+			nop_loc += 9;
+		}
+		for (int i = 0; i < int(12 / 4); i++)
+		{
+			Patch<uint32_t>(nop_loc, 0x401F0F);
+			nop_loc += 4;
+		}
+
+		nop_loc = final_bool_offset + 0x7;
+		for (int i = 0; i < int(16 / 4); i++)
+		{
+			Patch<uint32_t>(nop_loc, 0x401F0F);
+			nop_loc += 4;
+		}
+		
+	}
+
 	bool OverrideProdEndpointsData(Trampoline* GameTramp)
 	{
 		printf("\n==OverrideGameEndpointsData==\n");
@@ -255,7 +337,7 @@ namespace MK12Hook::Hooks {
 		if (SettingsMgr->iLogLevel)
 			printf("ProdEndpointLoader Pattern Found at: %p\n", lpPattern);
 
-		MakeProxyFromOpCode(GameTramp, call_address, (uint8_t)4, MK12Hook::Proxies::OverrideProdEndpoint, &MK12::SetFStringValue, PATCH_CALL);
+		MakeProxyFromOpCode(GameTramp, call_address, (uint8_t)4, MVSI::Proxies::OverrideProdEndpoint, &MVSGame::SetFStringValue, PATCH_CALL);
 	}
 
 	bool OverrideGameEndpointsData(Trampoline* GameTramp)
@@ -285,7 +367,7 @@ namespace MK12Hook::Hooks {
 		if (SettingsMgr->iLogLevel)
 			printf("EndpointLoader Pattern Found at: %p\n", lpPattern);
 
-		MakeProxyFromOpCode(GameTramp, call_address, (uint8_t)4, MK12Hook::Proxies::OverrideGameEndpoint, &MK12::GetEndpointKeyValue, PATCH_CALL);
+		MakeProxyFromOpCode(GameTramp, call_address, (uint8_t)4, MVSI::Proxies::OverrideGameEndpoint, &MVSGame::GetEndpointKeyValue, PATCH_CALL);
 
 		printfSuccess("EndpointLoader Proxied");
 		return true;
@@ -294,7 +376,7 @@ namespace MK12Hook::Hooks {
 
 };
 
-namespace MK12Hook::Mods {
+namespace MVSI::Mods {
 
 }
 

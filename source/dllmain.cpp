@@ -1,12 +1,11 @@
 #include "includes.h"
-#include "src/mkutils.h"
-#include "src/mk12.h"
-#include "src/mk12hook.h"
-#include "mk12sdk/sdk.h"
+#include "src/mvsiutils.h"
+#include "src/mvs.h"
+#include "src/mvsi.h"
 #include <tlhelp32.h> 
 #include <VersionHelpers.h>
 
-constexpr const char * CURRENT_HOOK_VERSION = "0.0.3";
+constexpr const char * CURRENT_HOOK_VERSION = "0.0.4";
 
 Trampoline* GameTramp, * User32Tramp;
 
@@ -15,6 +14,8 @@ void SpawnError(const char*);
 void PreGameHooks();
 void ProcessSettings();
 bool OnInitializeHook();
+void SpawnP2PServer() {};
+void DespawnP2PServer() {};
 
 LRESULT CALLBACK KeyboardProc(int code, WPARAM wParam, LPARAM lParam)
 {
@@ -56,15 +57,19 @@ void PreGameHooks()
 
 	if (SettingsMgr->bDisableSignatureCheck)
 	{
-		HookMetadata::sActiveMods.bAntiSigCheck			= MK12Hook::Hooks::DisableSignatureCheck(GameTramp);
+		HookMetadata::sActiveMods.bAntiSigCheck			= MVSI::Hooks::DisableSignatureCheck(GameTramp);
 	}
 	if (SettingsMgr->bEnableServerProxy)
 	{
-		HookMetadata::sActiveMods.bGameEndpointSwap		= MK12Hook::Hooks::OverrideGameEndpointsData(GameTramp);
+		HookMetadata::sActiveMods.bGameEndpointSwap		= MVSI::Hooks::OverrideGameEndpointsData(GameTramp);
 	}
 	if (SettingsMgr->bEnableProdServerProxy)
 	{
-		HookMetadata::sActiveMods.bProdEndpointSwap		= MK12Hook::Hooks::OverrideProdEndpointsData(GameTramp);
+		HookMetadata::sActiveMods.bProdEndpointSwap		= MVSI::Hooks::OverrideProdEndpointsData(GameTramp);
+	}
+	if (SettingsMgr->bSunsetDate)
+	{
+		HookMetadata::sActiveMods.bSunsetDate			= MVSI::Hooks::PatchSunsetSetterIntoMVSIChecker(GameTramp);
 	}
 	
 }
@@ -132,7 +137,7 @@ bool OnInitializeHook()
 
 	if (!SettingsMgr->bAllowNonMK && !(VerifyProcessName("MultiVersus-Win64-Shipping.exe") || !VerifyProcessName("MultiVersus.exe") || !VerifyProcessName("MVSI.exe")))
 	{
-		SpawnError("MVSI only works with MultiVersus!");
+		SpawnError("MVSI only works with the original MVS steam game!");
 		return false;
 	}
 
@@ -158,89 +163,20 @@ bool OnInitializeHook()
 
 	ProcessSettings(); // Parse Settings
 	PreGameHooks(); // Queue Blocker
+	SpawnP2PServer();
 
 	return true;
 }
 
-// Plugin Stuff
-
-const char* MK12HookPlugin::GetPluginName()
-{
-	return "MVSI";
-}
-
-const char* MK12HookPlugin::GetPluginProject()
-{
-	return "MVSI";
-}
-
-const char* MK12HookPlugin::GetPluginTabName()
-{
-	return "MVSI";
-}
-
-void MK12HookPlugin::OnInitialize()
-{
-	if (MK12HOOKSDK::IsOK())
-		return;
-
-	printfInfo("Called as an EHP Plugin");
-	MK12HOOKSDK::Initialize();
-}
-
-void MK12HookPlugin::OnShutdown()
+static void OnShutdown()
 {
 	if (HookMetadata::KeyboardProcHook) // Will be unloaded once by DLL, and once by EHP.
 	{
 		UnhookWindowsHookEx(HookMetadata::KeyboardProcHook);
 		HookMetadata::KeyboardProcHook = nullptr;
 	}
-}
 
-void MK12HookPlugin::OnFrameTick()
-{
-	// Things like async calls and polling tasks
-}
-
-void MK12HookPlugin::OnFightStartup()
-{
-	// not implemented yet
-}
-
-char* GetVersionedHookName()
-{
-	static char tabText[512];
-	static bool bPrecalc = false;
-
-	if (bPrecalc)
-		return tabText;
-
-	std::strcpy(tabText, MK12HookPlugin::GetPluginName());
-	std::strcat(tabText, " Version ");
-	std::strcat(tabText, CURRENT_HOOK_VERSION);
-	bPrecalc = true;
-	return tabText;
-}
-
-void MK12HookPlugin::TabFunction()
-{
-	if (!MK12HOOKSDK::IsOK())
-		return;
-
-	static int counter = 0;
-	MK12HOOKSDK::ImGui_Text(GetVersionedHookName());
-
-	if (MK12HOOKSDK::ImGui_CollapsingHeader("Patches"))
-	{
-
-		bool toggles[] = {
-			HookMetadata::sActiveMods.bAntiSigCheck,
-		};
-		MK12HOOKSDK::ImGui_Checkbox("Pak Signature", &toggles[0]);
-
-	}
-	MK12HOOKSDK::ImGui_Separator();
-
+	DespawnP2PServer();
 }
 
 // Dll Entry
@@ -256,7 +192,7 @@ bool APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpRes)
 	case DLL_THREAD_ATTACH:
 	case DLL_THREAD_DETACH:
 	case DLL_PROCESS_DETACH:
-		MK12HookPlugin::OnShutdown();
+		OnShutdown();
 		break;
 	}
 	return true;

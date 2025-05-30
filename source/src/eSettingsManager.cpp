@@ -8,19 +8,23 @@ void eFirstRunManager::Init()
 {
 	ini = new CIniReader("mvsi_state.ini");
 
-	bPaidModWarned				= ini->ReadBoolean	("FirstRun",			"bPaidModWarned",			false);
-
+	bPaidModWarned = ini->ReadBoolean("FirstRun", "PaidModWarned", false);
 
 	if (!bPaidModWarned)
 	{
 		Save(); // Save before displaying message box since some users complaining about a crash
-		MessageBoxA(0, "Please note that MVS Infinite is a FREE revival mod for MultiVersus tool that is meant to be used with free content.\nIf you have paid for anything, ask for a refund.", "MVSI Installed", MB_ICONEXCLAMATION);
+		MessageBoxA(0,
+			"Please note that MVS Infinite is a FREE fan revival mod for MVS that is meant to be used with free content.\n"
+			"If you have paid for anything, ask for a refund.",
+			"MVSI Installed",
+			MB_ICONEXCLAMATION
+		);
 	}
 }
 
 void eFirstRunManager::Save()
 {
-	ini->WriteBoolean("FirstRun", "bPaidModWarned", true);
+	ini->WriteBoolean("FirstRun", "PaidModWarned", true);
 }
 
 void eSettingsManager::Init()
@@ -28,38 +32,38 @@ void eSettingsManager::Init()
 	CIniReader ini("");
 
 	// Debug Settings
-	bEnableConsoleWindow		= ini.ReadBoolean	("Settings.Debug",		"bEnableConsoleWindow",		false);
-	bPauseOnStart				= ini.ReadBoolean	("Settings.Debug",		"bPauseOnStart",			false);
-	bDebug						= ini.ReadBoolean	("Settings.Debug",		"bDebug",					false);
-	bAllowNonMK					= ini.ReadBoolean	("Settings.Deubg",		"bAllowNonMK",				false);
+	bEnableConsoleWindow		= ini.ReadBoolean	("Settings.Debug",		"ShowConsole",				false);
+	bPauseOnStart				= ini.ReadBoolean	("Settings.Debug",		"DebugPause",				false);
+	bDebug						= ini.ReadBoolean	("Settings.Debug",		"DebugLogging",				false);
+	bAllowNonMK					= ini.ReadBoolean	("Settings.Deubg",		"NonMVSPatching",			false);
 	
 	// Settings
-	iLogSize					= ini.ReadInteger	("Settings",			"iLogSize",					50);
-	iLogLevel					= ini.ReadInteger	("Settings",			"iLogLevel",				0);
-	szModLoader					= ini.ReadString	("Settings",			"szModLoader",				"Kernel32.CreateFileW");
-	szAntiCheatEngine			= ini.ReadString	("Settings",			"szAntiCheatEngine",		"User32.EnumChildWindows");
-	szCurlSetOpt				= ini.ReadString	("Settings",			"szCurlSetOpt",				"libcurl.curl_easy_setopt");
-	szCurlPerform				= ini.ReadString	("Settings",			"szCurlPerform",			"libcurl.curl_easy_perform");
-	bEnableKeyboardHotkeys		= ini.ReadBoolean	("Settings",			"bEnableKeyboardHotkeys",	true);
-	// Patches
+	iLogSize					= ini.ReadInteger	("Settings",			"LogSize",					50);
+	iLogLevel					= ini.ReadInteger	("Settings",			"LogLevel",				0);
+	szModLoader					= ini.ReadString	("Settings",			"ModLoader",				"Kernel32.CreateFileW");
+	szAntiCheatEngine			= ini.ReadString	("Settings",			"AntiCheatEngine",		"User32.EnumChildWindows");
+	szCurlSetOpt				= ini.ReadString	("Settings",			"CurlSetOpt",				"libcurl.curl_easy_setopt");
+	szCurlPerform				= ini.ReadString	("Settings",			"CurlPerform",			"libcurl.curl_easy_perform");
+	bEnableKeyboardHotkeys		= ini.ReadBoolean	("Settings",			"EnableKeyboardHotkeys",	true);
+	// Keybinds
+	hkMenu						= ini.ReadString	("Settings.Keybinds",	"ToggleMenu",				"F1");
 
-	// Patches.AntiCheat
-	bDisableSignatureCheck		= ini.ReadBoolean	("Patches.AntiCheat",	"bDisableSignatureCheck",	true);
+	// Patches
+	bSunsetDate					= ini.ReadBoolean   ("Patches",             "SunsetDate",              true);
+	bDisableSignatureCheck		= ini.ReadBoolean	("Patches",				"PakLoader",			   true);
 
 	// Patterns
-	pSigCheck					= ini.ReadString	("Patterns",			"pSigCheck",				"");
-	pEndpointLoader				= ini.ReadString	("Patterns",			"pEndpointLoader",			"");
-	pProdEndpointLoader			= ini.ReadString	("Patterns",			"pWBEndpointLoader",		"");
+	pSigCheck					= ini.ReadString	("Patterns",			"SigCheck",					"");
+	pEndpointLoader				= ini.ReadString	("Patterns",			"EndpointLoader",			"");
+	pProdEndpointLoader			= ini.ReadString	("Patterns",			"ProdEndpointLoader",		"");
+	pSunsetDate					= ini.ReadString	("Patterns",			"SunsetDate",				"");
 
 
-	// Keybinds
-	hkMenu						= ini.ReadString	("Keybinds",			"hkMenu",					"F1");
-	hkInfo						= ini.ReadString	("Keybinds",			"hkInfo",					"TAB");
-	hkCheats					= ini.ReadString	("Keybinds",			"hkCheats",					"F12");
+	
 
 	// Private Server
-	szServerUrl					= ini.ReadString	("Server",				"szServerUrl",				"");
-	bEnableServerProxy			= ini.ReadBoolean	("Server",				"bEnableServerProxy",		false);
-	szProdServerUrl				= ini.ReadString	("Server.Prod",			"szProdServerUrl",			"");
-	bEnableProdServerProxy		= ini.ReadBoolean	("Server.Prod",			"bEnableProdServerProxy",		false);
+	szServerUrl					= ini.ReadString	("Server.Game",			"ServerUrl",				"");
+	szProdServerUrl				= ini.ReadString	("Server.Prod",			"ServerUrl",				"");
+	bEnableServerProxy			= ini.ReadBoolean	("Server.Game",			"Enabled",					false);
+	bEnableProdServerProxy		= ini.ReadBoolean	("Server.Prod",			"Enabled",					false);
 }

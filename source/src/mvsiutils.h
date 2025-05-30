@@ -12,7 +12,7 @@
 #define			RVAtoLP( base, offset )		((PBYTE)base + offset)
 #define			FuncMap						std::map<std::string, ULONGLONG>
 #define			LibMap						std::map<std::string, FuncMap>
-#define			FNAME_STR(FName)			MK12::FNameFunc::ToStr(*FName)
+#define			FNAME_STR(FName)			MVSGame::FNameFunc::ToStr(*FName)
 typedef			__int64						int64;
 
 int64			GetGameEntryPoint();
@@ -76,6 +76,16 @@ template <typename T>
 void MakeProxyFromOpCode(Trampoline* GameTramp, uint64_t CallAddr, uint8_t JumpAddrSize, void* ProxyFunctionAddr, T** ProxyFuncPtr, PatchTypeEnum PatchType) // Jump size is either 4 or 8
 {
 	*ProxyFuncPtr = (T*)MakeProxyFromOpCode(GameTramp, CallAddr, JumpAddrSize, ProxyFunctionAddr, PatchType);
+}
+
+template <typename T>
+void GetProcFromOpCode(uint64_t CallAddr, uint8_t JumpAddrSize, T** ProxyFuncPtr) // Jump size is either 4 or 8
+{
+	CallAddr = GetGameAddr(CallAddr);
+	uint8_t callOpcSize = JumpAddrSize >> 2;
+	uint8_t funcLen = callOpcSize + JumpAddrSize;
+	uint64_t CalledFuncAddr = GetDestinationFromOpCode(CallAddr, callOpcSize, funcLen, JumpAddrSize);
+	*ProxyFuncPtr = (T*)CalledFuncAddr;
 }
 
 static void DummyVoidFunc() {}

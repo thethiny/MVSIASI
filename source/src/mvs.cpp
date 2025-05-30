@@ -1,12 +1,17 @@
-#include "mkutils.h"
-#include "mk12.h"
+#include "mvsiutils.h"
+#include "mvs.h"
 
 
 // Game Functions
-MK12::GetEndpointKeyValueType*			MK12::GetEndpointKeyValue			= nullptr;
-MK12::SetFStringValueType*				MK12::SetFStringValue				= nullptr;
+MVSGame::GetEndpointKeyValueType*			MVSGame::GetEndpointKeyValue			= nullptr;
+MVSGame::SetFStringValueType*				MVSGame::SetFStringValue				= nullptr;
+MVSGame::FDateTimeType*						MVSGame::FDateTime						= nullptr;
+MVSGame::InitThreadHeaderType*				MVSGame::Init_thread_header				= nullptr;
+MVSGame::InitThreadFooterType*				MVSGame::Init_thread_footer				= nullptr;
+// Game vars
+uint64_t*									MVSGame::kSunsetDate					= nullptr;
 
-namespace MK12::FNameFunc {
+namespace MVSGame::FNameFunc {
 	inline uint16_t GetSize(FName& F)
 	{
 		return F.NameSize >> 6;

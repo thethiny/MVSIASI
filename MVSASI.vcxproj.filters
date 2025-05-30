@@ -25,13 +25,10 @@
     <Filter Include="Resource Files\Utils">
       <UniqueIdentifier>{0743fe0a-778f-4333-b10d-5e593bb95e2c}</UniqueIdentifier>
     </Filter>
-    <Filter Include="MK12SDK">
-      <UniqueIdentifier>{9e920532-4fdd-452b-b722-767ecd2bb285}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\MK12">
+    <Filter Include="Header Files\MVS">
       <UniqueIdentifier>{5d6b45de-de39-4626-96ca-d8bc4b453bc9}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\MK12">
+    <Filter Include="Source Files\MVS">
       <UniqueIdentifier>{3ec9f235-9336-422d-9322-a38311ebc9e8}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
@@ -57,20 +54,14 @@
     <ClCompile Include="pch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="source\src\MK12Unlocker.cpp">
-      <Filter>Source Files\MK12</Filter>
+    <ClCompile Include="source\src\mvsutils.cpp">
+      <Filter>Source Files\MVS</Filter>
     </ClCompile>
-    <ClCompile Include="source\mk12sdk\sdk.cpp">
-      <Filter>MK12SDK</Filter>
+    <ClCompile Include="source\src\mvsi.cpp">
+      <Filter>Source Files\MVS</Filter>
     </ClCompile>
-    <ClCompile Include="source\src\mkutils.cpp">
-      <Filter>Source Files\MK12</Filter>
-    </ClCompile>
-    <ClCompile Include="source\src\mk12hook.cpp">
-      <Filter>Source Files\MK12</Filter>
-    </ClCompile>
-    <ClCompile Include="source\src\mk12.cpp">
-      <Filter>Source Files\MK12</Filter>
+    <ClCompile Include="source\src\mvs.cpp">
+      <Filter>Source Files\MVS</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -107,23 +98,14 @@
     <ClInclude Include="framework.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="source\src\MK12Unlocker.h">
-      <Filter>Header Files\MK12</Filter>
+    <ClInclude Include="source\src\mvsiutils.h">
+      <Filter>Header Files\MVS</Filter>
     </ClInclude>
-    <ClInclude Include="source\mk12sdk\sdk.h">
-      <Filter>MK12SDK</Filter>
+    <ClInclude Include="source\src\mvsi.h">
+      <Filter>Header Files\MVS</Filter>
     </ClInclude>
-    <ClInclude Include="source\src\mkutils.h">
-      <Filter>Header Files\MK12</Filter>
-    </ClInclude>
-    <ClInclude Include="source\src\mk12hook.h">
-      <Filter>Header Files\MK12</Filter>
-    </ClInclude>
-    <ClInclude Include="source\src\mk12.h">
-      <Filter>Header Files\MK12</Filter>
-    </ClInclude>
-    <ClInclude Include="source\src\mk12_enums.h">
-      <Filter>Header Files\MK12</Filter>
+    <ClInclude Include="source\src\mvs.h">
+      <Filter>Header Files\MVS</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
