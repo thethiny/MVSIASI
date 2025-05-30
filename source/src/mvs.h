@@ -2,19 +2,115 @@
 #include <cppython.h>
 #include <map>
 
+namespace UE {
+	template <class T>
+	class TArray
+	{
+	public:
+		T* Data;
+		int Count;
+		int Max;
+
+		//TArray();
+		T& Get(int id) { return this->Data[id]; }
+		//void Add(T data);
+
+		TArray()
+		{
+			Data = new T[4];
+			Count = 0;
+			Max = 4;
+		}
+
+		void Add(T InputData)
+		{
+			if (Count + 1 > Max)
+				return;
+			Data[Count++] = InputData;
+		}
+	};
+
+
+	class FString : public TArray<wchar_t>
+	{
+	public:
+		wchar_t* GetStr();
+	};
+
+	enum EFindName
+	{
+		FNAME_Find,
+		FNAME_Add,
+		FNAME_Replace,
+	};
+
+	class FName
+	{
+	public:
+		int Index;
+		int Number;
+
+
+		FName();
+		FName(const char* Name);
+		FName(const wchar_t* Name);
+		FString* ToString(FString*);
+
+		using ToStringType = FString * (__fastcall*)(FName* This, FString* result);
+		static inline ToStringType ToStringPtr = nullptr;
+
+		using FNameConstructorCharType = void(__fastcall*)(FName* This, const char* Name, EFindName FindType);
+		static inline FNameConstructorCharType FNameCharConstructor = nullptr;
+
+		using FNameConstructorWCharType = void(__fastcall*)(FName* This, const wchar_t* Name, EFindName FindType);
+		static inline FNameConstructorWCharType FNameWCharConstructor = nullptr;
+	};
+
+	struct FTextData {
+		uint8_t		Pad[0x30];
+		FString		TextSource;
+	};
+
+	class FText {
+	public:
+		FTextData* TextData;
+		uint8_t		Pad[0x10];
+
+		FText();
+		FText(const wchar_t*);
+		FText(const char*);
+		FText(const FText&);
+
+		using FromStringType = FText * (__fastcall*)(FText*, const FString*);
+		static inline FromStringType FromString = nullptr;
+
+		using FromNameType = FText * (__fastcall*)(FText*, FName*);
+		static inline FromNameType FromName = nullptr;
+
+		using GetEmptyType = FText * (__fastcall*)(void);
+		static inline GetEmptyType GetEmpty = nullptr;
+	};
+
+	class FDelegateBase
+	{
+	public:
+		void** DelegateAllocator;
+		int DelegateSize;
+		int pad;
+	};
+
+	class TMulticastDelegateBase
+	{
+	public:
+		TArray<FDelegateBase> InvocationList; // FDelegateBase which is size 0x10
+		int CompactionThreshold;
+		int InvocationListLockCount;
+	};
+};
+
 namespace MVSGame { // Namespace for game functions / structs
 
-	// Structs
-	struct FName {
-		uint16_t	NameSize;
-		char		Name[];
-	};
-
-	struct FNameInfoStruct {
-		uint16_t	NameOffset;
-		uint16_t	NameTableId;
-		uint32_t	DuplicateId;
-	};
+	using namespace UE;
 
 	struct UNameTableStruct {
 		uint32_t	UNK;
@@ -40,14 +136,78 @@ namespace MVSGame { // Namespace for game functions / structs
 		int32_t		ValueLength8BAligned;
 	};
 
+	struct DialogFocusButton {
+		int Value = 0;
+		bool bIsSet = false;
+	};
 
-	namespace FNameFunc {
-		inline uint16_t	GetSize(FName& F);
-		inline char*	GetName(FName& F);
-		void			Print(FName& F);
-		char*			ToStr(FName& F);
-		FName*			FromStr(const char* string);
-	}
+	struct FMvsDialogParameters {
+		FText                                   PromptText = FText();
+		FText                                   PromptDescriptionText = FText();
+		void*									DialogContentClass = 0;
+		FText                                   ButtonOneText = FText();
+		FText                                   ButtonTwoText = FText();
+		FText                                   ButtonThreeText = FText();
+		bool                                    bShowSpinner = false;
+		bool                                    bShowExitButton = true;
+		bool                                    bShowSolidBackground = false;
+		bool                                    bHideActionBar = false;
+		// Optional
+		DialogFocusButton						ButtonToFocus = DialogFocusButton();
+	};
+
+	class UFighterGameInstance;
+	class UMvsDialog
+	{
+	private:
+		uint8_t INHERITED[0x3D8];
+	public:
+		uint8_t									BP_OnButtonOneClicked[0x10];
+		TMulticastDelegateBase					OnButtonOneClicked;
+		uint8_t									BP_OnButtonTwoClicked[0x10];
+		TMulticastDelegateBase					OnButtonTwoClicked;
+		uint8_t									BP_OnButtonThreeClicked[0x10];
+		TMulticastDelegateBase					OnButtonThreeClicked;
+		TMulticastDelegateBase					OnCancelled;
+		uint8_t									OnDismissed[0x10];
+		TMulticastDelegateBase					NativeOnDismissed;
+	private:
+		uint8_t RemainingItems[0x90];
+
+
+	public:
+		uint64_t AssignCallbackToButton(TMulticastDelegateBase*, void* = nullptr, void* = nullptr);
+	};
+
+	class UMvsFrontendManager
+	{
+	public:
+		using AddDialogType = UMvsDialog * (__fastcall*)(UMvsFrontendManager*, FMvsDialogParameters*);
+		static inline AddDialogType AddDialogPtr = nullptr;
+
+		UMvsDialog* AddDialog(FMvsDialogParameters* Params) { return AddDialogPtr(this, Params); }
+	};
+
+	class FakeVFTabler
+	{
+	public:
+		void** vftable_ptr;
+
+		FakeVFTabler()
+		{
+			vftable_ptr = new void*[11]();
+			for (int i = 0; i < 11; i++)
+				vftable_ptr[i] = (void*)&FakeVFTabler::EmptyFunction;
+		}
+
+		void AddFunction(void* func, int index)
+		{
+			vftable_ptr[index] = func;
+		}
+
+	private:
+		static void __fastcall EmptyFunction() {};
+	};
 
 	template <typename T>
 	class TArray {
@@ -131,35 +291,34 @@ namespace MVSGame { // Namespace for game functions / structs
 
 	
 	extern std::map<uint64_t, CURL::HTTPPostStruct*>	CurlObjectMap;
-	//extern UNameTableStruct*							UNameTable;
-	//extern UNameTableMainStruct*						UMainNameTable;
-
-	FName* NameTableIndexToFName(FNameInfoStruct*);
-	FName* NameTableIndexToFName(uint16_t NameTableId, uint16_t NameOffset);
 
 	// Game Functions
 	// JSONEndpoint
 	typedef			const char**					(__fastcall	GetEndpointKeyValueType)			(int64_t*, const char*);
 	typedef			int64_t*						(__fastcall	SetFStringValueType)				(int64_t*, const wchar_t*);
+	// Sunset
 	typedef			void							(__fastcall FDateTimeType)						(uint64_t*, int, int, int, int, int, int, int);
 	typedef			void							(__fastcall InitThreadHeaderType)				(int32_t*);
 	typedef			int								(__fastcall InitThreadFooterType)				(int32_t*);
+	// Dialog
+	typedef			void							(__fastcall DialogParamsType)					(FMvsDialogParameters*, FText*, uint8_t);
+	//typedef			uint64_t*						(__fastcall AddDialogUtilType)					(uint64_t*, FMvsDialogParameters*);
+	//typedef			UMvsDialog*						(__fastcall AddDialogFrontType)					(UMvsFrontendManager*, FMvsDialogParameters*);
+	typedef			UFighterGameInstance*			(__fastcall UFighterGameInstanceConstType)		(UFighterGameInstance*, const uint64_t*);
+	typedef			UMvsFrontendManager*			(__fastcall GetFrontendManagerType)				(UFighterGameInstance*);
+	typedef			void							(__fastcall SingleParamDialogCallbackSetterType)(TMulticastDelegateBase*, uint64_t*, MVSGame::UMvsDialog*, MVSGame::UMvsDialog*&);
+	typedef			bool							(__fastcall QuitGameParamsType)					(UMvsDialog*);
+
 
 	// ReCreated
 	namespace Remake {
-		uint64_t	__fastcall	FNameInfoToWString(FNameInfoStruct* FNameInfo, char* Destination); // Common between 1 & 2
-		uint64_t	__fastcall	FNameObjectToWStringCommon(FName* Name, char* Destination); // Common between all
-		uint64_t	__fastcall	FNameInfoToWStringNoId(FNameInfoStruct* FNameInfo, char* Destination); // 1
-		uint64_t	__fastcall	FNameInfoToWStringWithId(FNameInfoStruct* FNameInfo, char* Destination); // 2
-		uint64_t	__fastcall	FNameObjectToWString(FName* Name, char* Destination); // 3 // Used for Proxy
-		bool		__fastcall	GetArgBoolByNameWrapper(uint64_t* thisPtr, wchar_t* ArgName);
-		bool		__fastcall	GetArgBoolByName(uint64_t *thisPtr, wchar_t* ArgName);
+		
 	}
 
 	// externs
-	//extern ReadFStringType*								ReadFString;
-	//extern FNameToWStrType*								FNameToWStr;
-	//extern InitializeNameTableType*						InitializeNameTable;
+	//extern ReadFStringType*							ReadFString;
+	//extern FNameToWStrType*							FNameToWStr;
+	//extern InitializeNameTableType*					InitializeNameTable;
 	//extern uint64_t*									ReadFNameToWStrNoIdStart;
 	//extern uint64_t*									ReadFNameToWStrWithIdStart;
 	//extern uint64_t*									ReadFNameToWStrCommonStart;
@@ -169,5 +328,19 @@ namespace MVSGame { // Namespace for game functions / structs
 	extern FDateTimeType*								FDateTime;
 	extern InitThreadHeaderType*						Init_thread_header;
 	extern InitThreadFooterType*						Init_thread_footer;
+	extern DialogParamsType*							FMvsDialogParametersConst;
+	//extern AddDialogUtilType*							AddDialogUtil;
+	//extern AddDialogFrontType*							AddDialogFront;
+	extern UFighterGameInstanceConstType*				UFigherGameInstanceConst;
+	extern GetFrontendManagerType*						GetFrontendManager;
+	extern SingleParamDialogCallbackSetterType*			SingleParamDialogCallbackSetter;
+	extern QuitGameParamsType*							QuitGame;
+	// Variables
 	extern uint64_t*									kSunsetDate;
+	extern MVSGame::FText*								GLeave_Lobby_Prompt_Text;
+
+	namespace Instances {
+		extern uint64_t* ThisWidget;
+		extern UFighterGameInstance* FighterGame;
+	}
 }

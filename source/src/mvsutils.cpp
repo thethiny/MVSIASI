@@ -29,13 +29,14 @@ int64 GetModuleEntryPoint(const char* name)
 
 int64 GetGameAddr(__int64 addr)
 {
-	int64 Entry = GetGameEntryPoint();
-	return addr > Entry - 40000000 ? addr : Entry + addr;
-	if (addr > Entry)
+	int64_t base = GetGameEntryPoint();
+	if (addr >= 0x140000000 && addr < base)
+		return addr - 0x140000000 + base;
+
+	if (addr >= base)
 		return addr;
-	if (addr > Entry - 40000000)
-		return addr;
-	return Entry + addr;
+
+	return base + addr;
 }
 
 int64 GetUser32Addr(__int64 addr)
@@ -149,6 +150,16 @@ uint64_t* FindPattern(void* handle, std::string_view bytes)
 		return pCamPattern.get(0).get<uint64_t>(0);
 	}
 	return nullptr;
+}
+
+uint64_t* FindPattern(std::string pattern)
+{
+	return FindPattern(GetModuleHandleA(NULL), pattern);
+}
+
+uint64_t* FindPattern(const char* pattern)
+{
+	return FindPattern(std::string(pattern));
 }
 
 uint64_t HookPattern(std::string Pattern, const char* PatternName, void* HookProc, int64_t PatternOffset, PatchTypeEnum PatchType, uint64_t PrePat, uint64_t* Entry)
@@ -534,4 +545,43 @@ namespace RegisterHacks {
 
 		bIsEnabled = true;
 	}
+}
+
+uint64_t HashTextSectionOfHost()
+{
+	LARGE_INTEGER start, end, freq;
+	QueryPerformanceFrequency(&freq);
+	QueryPerformanceCounter(&start);
+
+	HMODULE base = GetModuleHandleW(nullptr);
+	if (!base) return 0;
+
+	auto dos = (PIMAGE_DOS_HEADER)base;
+	if (dos->e_magic != IMAGE_DOS_SIGNATURE) return 0;
+
+	auto nt = (PIMAGE_NT_HEADERS)((BYTE*)base + dos->e_lfanew);
+	if (nt->Signature != IMAGE_NT_SIGNATURE) return 0;
+
+	auto section = IMAGE_FIRST_SECTION(nt);
+	for (int i = 0; i < nt->FileHeader.NumberOfSections; ++i, ++section) {
+		if (memcmp(section->Name, ".text", 5) == 0) {
+			uint8_t* data = (uint8_t*)base + section->VirtualAddress;
+			DWORD size = section->Misc.VirtualSize;
+
+			uint64_t hash = 14695981039346656037ULL;
+			for (DWORD j = 0; j < size; ++j)
+				hash = (hash ^ data[j]) * 1099511628211ULL;
+
+			QueryPerformanceCounter(&end);
+			double elapsedMs = (end.QuadPart - start.QuadPart) * 1000.0 / freq.QuadPart;
+
+			printf(".text hash: 0x%016llX | Time: %.3f ms\n", hash, elapsedMs);
+			return hash;
+		}
+	}
+
+	QueryPerformanceCounter(&end);
+	double elapsedMs = (end.QuadPart - start.QuadPart) * 1000.0 / freq.QuadPart;
+	printf("Failed to find .text | Time: %.3f ms\n", elapsedMs);
+	return 0;
 }

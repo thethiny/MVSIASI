@@ -5,7 +5,50 @@ HookMetadata::ActiveMods			HookMetadata::sActiveMods;
 HookMetadata::LibMapsStruct			HookMetadata::sLFS;
 bool MVSI::IsMVSIUpdateRequired = false;
 
+template<typename T>
+MVSGame::UMvsDialog* MVSI::ShowDialog(
+		const T* promptText, const T* description, const T* button1, const T* button2, const T* button3, const int selectedButton,
+		bool ShowExitButton, bool ShowSpinner, bool ShowSolidBackground, bool HideActionBar
+	)
+{
+	using namespace MVSGame;
 
+	UMvsFrontendManager* frontend = GetFrontendManager(Instances::FighterGame);
+	if (!frontend || !*(uint64_t*)((uint64_t)frontend + 0xC8)) // C8 = CurrentStateWidget
+		return nullptr;
+
+	FMvsDialogParameters DialogParameters;
+	DialogParameters.PromptText = FText(promptText);
+
+	if (description)
+		DialogParameters.PromptDescriptionText = FText(description);
+
+	if (button1)
+		DialogParameters.ButtonOneText = FText(button1);
+
+	if (button2)
+		DialogParameters.ButtonTwoText = FText(button2);
+
+	if (button3)
+		DialogParameters.ButtonThreeText = FText(button3);
+
+	if (selectedButton != -1)
+	{
+		DialogParameters.ButtonToFocus.Value = selectedButton;
+		DialogParameters.ButtonToFocus.bIsSet = true;
+	}
+	else
+	{
+		DialogParameters.ButtonToFocus.bIsSet = false;
+	}
+
+	DialogParameters.bShowExitButton = ShowExitButton;
+	DialogParameters.bShowSpinner = ShowSpinner;
+	DialogParameters.bShowSolidBackground = ShowSolidBackground;
+	DialogParameters.bHideActionBar = HideActionBar;
+
+	return frontend->AddDialog(&DialogParameters);
+}
 
 namespace MVSI::Proxies {
 
@@ -33,18 +76,64 @@ namespace MVSI::Proxies {
 		return CreateFileW(lpFileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
 	}
 
+	void __cdecl DummyPrint(uint64_t* a) {
+		printf("DUMMY PRINT! %p\n", a);
+	}
 
+	void __cdecl TestCallback(uint64_t* a) {
+		printf("Test Callback! %p\n", a);
+	}
+
+	MVSGame::UFighterGameInstance* CopyFighterInstance(MVSGame::UFighterGameInstance* t, uint64_t* a2)
+	{
+		MVSGame::Instances::FighterGame = t;
+		return MVSGame::UFigherGameInstanceConst(t, a2);
+	}
+
+	void SaveModWarningState()
+	{
+		FirstRunMgr->bPaidModWarned = true;
+		FirstRunMgr->Save();
+	}
 
 	bool MVSIOfflineModeChecker(int32_t* _TSS0_395)
 	{
+		static bool isUpdateWarned = !SettingsMgr->bDebug; // Only for debug now
+		static bool isPaidWarnShown = FirstRunMgr->bPaidModWarned;
 		MVSGame::Init_thread_header(_TSS0_395);
 		if (_TSS0_395[0] == -1) // This portion will only be called once
 		{
 			// Check for updates
+
+				
 			//MVSGame::FDateTime(MVSGame::kSunsetDate, 2025, 6, 1, 0, 0, 0, 0); // No longer needed
 			MVSI::IsMVSIUpdateRequired = false;
 
 			MVSGame::Init_thread_footer(_TSS0_395);
+		}
+
+		if (!isPaidWarnShown && MVSGame::Instances::FighterGame)
+		{
+
+			MVSGame::UMvsDialog* dialog = ShowDialog((const char*)"MVSI is a FREE mod!", (const char*)"If you have paid for this, please ask for a refund!", (const char*)"I Agree", (const char*)"I Disagree");
+			if (dialog)
+			{
+				uint64_t resultNo = dialog->AssignCallbackToButton(&dialog->OnButtonTwoClicked, MVSGame::QuitGame);
+				uint64_t resultYes = dialog->AssignCallbackToButton(&dialog->OnButtonOneClicked, &SaveModWarningState);
+
+				isPaidWarnShown = true;
+			}			
+		}
+
+		if (!isUpdateWarned && MVSGame::Instances::FighterGame)
+		{
+			MVSGame::UMvsDialog* dialog = ShowDialog((const char*)"New Update Available!", (const char*)"Would you like to download the update now?", (const char*)"Yes", (const char*)"Play Offline");
+			if (dialog)
+			{
+				uint64_t resultYes = dialog->AssignCallbackToButton(&dialog->OnButtonOneClicked, MVSGame::QuitGame); // Change to the update one
+				uint64_t resultNo = dialog->AssignCallbackToButton(&dialog->OnButtonTwoClicked); // Create function to disable internet or simply refuse connections from the server.
+				isUpdateWarned = true;
+			}
 		}
 		
 		return MVSI::IsMVSIUpdateRequired; // Other checks can also be placed here
@@ -61,7 +150,9 @@ namespace MVSI::Proxies {
 			int StringLength = (ServerUrl.size() + 1) * 2;
 			std::wstring wServerUrl = std::wstring(ServerUrl.begin(), ServerUrl.end());
 
+			SetColorCyan();
 			wprintf(L"Rerouting traffic from Prod Server \"%s\" to \"%s\"!\n", EndpointUrl, wServerUrl.c_str());
+			ResetColors();
 
 			const wchar_t* end = wServerUrl.c_str();
 
@@ -88,21 +179,14 @@ namespace MVSI::Proxies {
 			int StringLength = (ServerUrl.size() + 1) * 2;
 			std::wstring wServerUrl = std::wstring(ServerUrl.begin(), ServerUrl.end());
 
+			SetColorCyan();
 			wprintf(L"Rerouting traffic from MVS server \"%llx\" to \"%s\"!\n", (int64_t)EndpointAddress, wServerUrl.c_str());
+			ResetColors();
 
 			const char* end = ServerUrl.c_str();
 
 			MVSGame::GetEndpointKeyValue(TargetStringDest, end);
 			return (const char**)TargetStringDest;
-
-			//obj.ValuePointer = new wchar_t[StringLength];
-			//memcpy(obj.ValuePointer, wServerUrl.c_str(), StringLength);
-
-			//obj.ValueLength = ServerUrl.size() + 1; // Characters count in str and not wstr
-			//obj.ValueLength8BAligned = (obj.ValueLength + 7) & (~7);
-
-			//MVSGame::GetEndpointKeyValue(obj, EndpointAddress);
-			//return &obj.ValuePointer;
 		}
 
 		return MVSGame::GetEndpointKeyValue(TargetStringDest, EndpointAddress);
@@ -213,28 +297,25 @@ namespace MVSI::Hooks {
 			return false;
 		}
 
-		uint64_t* lpSigCheckPattern = FindPattern(GetModuleHandleA(NULL), SettingsMgr->pSigCheck);
+		PatternFinder lpSigCheckPattern = SettingsMgr->pSigCheck;
 		if (!lpSigCheckPattern)
 		{
 			printfError("Couldn't find SigCheck Pattern\n");
 			return false;
 		}
 
-		uint64_t hook_address = (uint64_t)lpSigCheckPattern + 0x30;
+		lpSigCheckPattern += 0x30;
 		if (SettingsMgr->iLogLevel)
-			printf("SigCheck Pattern found at: %p\n", lpSigCheckPattern);
+			printf("SigCheck Pattern found at: %p\n", (uint64_t*)lpSigCheckPattern);
 
+		// Old method
 		//uint64_t CalledFuncAddr = GetDestinationFromOpCode(hook_address+7, 1, 5, 4);
-
-		//if (SettingsMgr->iLogLevel)
-		//	printf("SigCheck Function Callee found at: %p\n", (uint64_t*)CalledFuncAddr);
-		//
-
 		//Patch(GetGameAddr(CalledFuncAddr), (uint8_t)0xC3); // ret
 		//Patch(GetGameAddr(CalledFuncAddr) + 1, (uint32_t)0x90909090); // Nop
+
 		MakeProxyFromOpCode(
 			GameTramp,
-			hook_address + 7,
+			lpSigCheckPattern + 7,
 			(uint8_t)4,
 			&DummyVoidFunc,
 			PATCH_JUMP
@@ -256,23 +337,22 @@ namespace MVSI::Hooks {
 			return false;
 		}
 
-		uint64_t* lpPattern = FindPattern(GetModuleHandleA(NULL), pattern);
+		PatternFinder lpPattern = pattern;
 		if (!lpPattern)
 		{
 			printfError("Couldn't find SunsetDate Pattern");
 			return false;
 		}
 
-		uint64_t call_address = ((uint64_t)lpPattern);
 		if (SettingsMgr->iLogLevel)
-			printf("SunsetDate Pattern Found at: %p\n", lpPattern);
+			printf("SunsetDate Pattern Found at: %p\n", (uint64_t*)lpPattern);
 
-		MakeProxyFromOpCode(GameTramp, call_address + 7, (uint8_t)4, MVSI::Proxies::MVSIOfflineModeChecker, &MVSGame::Init_thread_header, PATCH_CALL);
-		GetProcFromOpCode(call_address + 0x47, 4, &MVSGame::Init_thread_footer);
-		GetProcFromOpCode(call_address + 0x3B, 4, &MVSGame::FDateTime);
-		MVSGame::kSunsetDate = (uint64_t*) GetDestinationFromOpCode(call_address + 0x19, 3, 7, 4);
+		MakeProxyFromOpCode(GameTramp, lpPattern + 7, (uint8_t)4, MVSI::Proxies::MVSIOfflineModeChecker, &MVSGame::Init_thread_header, PATCH_CALL);
+		GetProcFromOpCode(lpPattern + 0x47, 4, &MVSGame::Init_thread_footer);
+		GetProcFromOpCode(lpPattern + 0x3B, 4, &MVSGame::FDateTime);
+		MVSGame::kSunsetDate = (uint64_t*) GetDestinationFromOpCode(lpPattern + 0x19, 3, 7, 4);
 		
-		uint64_t final_bool_offset = call_address - 0x2F;
+		uint64_t final_bool_offset = lpPattern - 0x2F;
 		Memory::VP::InjectHook(final_bool_offset, GameTramp->Jump(MVSI::Proxies::MVSIOfflineModeChecker), PATCH_CALL);
 		Patch<uint16_t>(final_bool_offset + 0x5, 0x10EB);
 
@@ -285,10 +365,10 @@ namespace MVSI::Hooks {
 		}
 				
 		// Jump to the cleanup function
-		Patch<uint16_t>(call_address + 0xC, 0xDAEB);
+		Patch<uint16_t>((uint64_t)lpPattern + 0xC, 0xDAEB);
 		
 		// Nop the addresses
-		uint64_t nop_loc = call_address + 0xE;
+		uint64_t nop_loc = lpPattern + 0xE;
 		for (int i = 0; i < int(0x40 / 9) - 1; i++) // 7 times
 		{
 			Patch<uint64_t>(nop_loc, 0x841F0F66);
@@ -307,6 +387,8 @@ namespace MVSI::Hooks {
 			Patch<uint32_t>(nop_loc, 0x401F0F);
 			nop_loc += 4;
 		}
+
+		printfSuccess("Sunset Function Proxied");
 		
 	}
 
@@ -326,18 +408,21 @@ namespace MVSI::Hooks {
 			return false;
 		}
 
-		uint64_t* lpPattern = FindPattern(GetModuleHandleA(NULL), pattern);
+		PatternFinder lpPattern = pattern;
 		if (!lpPattern)
 		{
 			printfError("Couldn't find ProdEndpointLoader Pattern");
 			return false;
 		}
 
-		uint64_t call_address = ((uint64_t)lpPattern) + 0x0A;
+		lpPattern += 0x0A;
 		if (SettingsMgr->iLogLevel)
-			printf("ProdEndpointLoader Pattern Found at: %p\n", lpPattern);
+			printf("ProdEndpointLoader Pattern Found at: %p\n", (uint64_t*)lpPattern);
 
-		MakeProxyFromOpCode(GameTramp, call_address, (uint8_t)4, MVSI::Proxies::OverrideProdEndpoint, &MVSGame::SetFStringValue, PATCH_CALL);
+		MakeProxyFromOpCode(GameTramp, lpPattern, 4, MVSI::Proxies::OverrideProdEndpoint, &MVSGame::SetFStringValue, PATCH_CALL);
+
+		printfSuccess("ProdEndpointLoader Proxied");
+		return true;
 	}
 
 	bool OverrideGameEndpointsData(Trampoline* GameTramp)
@@ -356,23 +441,220 @@ namespace MVSI::Hooks {
 			return false;
 		}
 
-		uint64_t* lpPattern = FindPattern(GetModuleHandleA(NULL), pattern);
+		PatternFinder lpPattern = pattern;
 		if (!lpPattern)
 		{
 			printfError("Couldn't find EndpointLoader Pattern");
 			return false;
 		}
 
-		uint64_t call_address = ((uint64_t)lpPattern) + 0x0A;
+		lpPattern += 0x0A;
 		if (SettingsMgr->iLogLevel)
-			printf("EndpointLoader Pattern Found at: %p\n", lpPattern);
+			printf("EndpointLoader Pattern Found at: %p\n", (uint64_t*)lpPattern);
 
-		MakeProxyFromOpCode(GameTramp, call_address, (uint8_t)4, MVSI::Proxies::OverrideGameEndpoint, &MVSGame::GetEndpointKeyValue, PATCH_CALL);
+		MakeProxyFromOpCode(GameTramp, lpPattern, 4, MVSI::Proxies::OverrideGameEndpoint, &MVSGame::GetEndpointKeyValue, PATCH_CALL);
 
 		printfSuccess("EndpointLoader Proxied");
 		return true;
 	}
 
+	bool DialogHooks(Trampoline* GameTramp)
+	{
+		printf("\n==Dialog Funcs==\n");
+		if (!HookMetadata::sActiveMods.bUEFuncs)
+		{
+			printfError("UE Funcs were not enabled therefore Dialog cannot be used!");
+			return false;
+		}
+
+		if (SettingsMgr->pFighterInstance.empty())
+		{
+			printfError("pFighterInstance Not Specified. Please Add Pattern to ini file!");
+			return false;
+		}
+		PatternFinder lpPattern = SettingsMgr->pFighterInstance;
+		if (!lpPattern)
+		{
+			printfError("Couldn't find FighterInstance Pattern");
+			return false;
+		}
+
+		uint64_t address = GetDestinationFromOpCode(lpPattern, 3, 7, 4); // Couldn't get inside cuz too small, so get outside's lea, go inside, offset.
+		MakeProxyFromOpCode(GameTramp, address + 14, 4, MVSI::Proxies::CopyFighterInstance, &MVSGame::UFigherGameInstanceConst, PATCH_JUMP); // 0x1422943BE
+
+		if (SettingsMgr->iLogLevel)
+		{
+			printf("FighterInstance Pattern Found at: %p\n", (uint64_t*)lpPattern);
+			printf("FighterInstance Proxied from %p to %p\n", MVSGame::UFigherGameInstanceConst, MVSI::Proxies::CopyFighterInstance);
+		}
+
+		if (SettingsMgr->pDialog.empty())
+		{
+			printfError("pDialog Not Specified. Please Add Pattern to ini file!");
+			return false;
+		}
+		lpPattern = SettingsMgr->pDialog;
+		if (!lpPattern)
+		{
+			printfError("Couldn't find Dialog Pattern");
+			return false;
+		}
+
+		MVSGame::UMvsFrontendManager::AddDialogPtr = (MVSGame::UMvsFrontendManager::AddDialogType)(uint64_t*)(lpPattern + 30); // 0x142766C50
+		GetProcFromOpCode(lpPattern + 38, 4, &MVSGame::GetFrontendManager); // 0x142722980
+
+		if (SettingsMgr->iLogLevel)
+		{
+			printf("Dialog Pattern Found at: %p\n", (uint64_t*)lpPattern);
+			printf("AddDialog at %p\n", MVSGame::UMvsFrontendManager::AddDialogPtr);
+			printf("FrontendManager at %p\n", MVSGame::GetFrontendManager);
+		}
+
+		if (!SettingsMgr->pDialogParams.empty())
+		{
+			lpPattern = SettingsMgr->pDialogParams;
+			if (lpPattern)
+			{
+				MVSGame::FMvsDialogParametersConst = (MVSGame::DialogParamsType*)(uint64_t*)lpPattern; // 0x14276C2F0
+				//MVSGame::GLeave_Lobby_Prompt_Text = (MVSGame::FText*)GetGameAddr(0x1480ADDB0);
+
+				if (SettingsMgr->iLogLevel)
+				{
+					printf("DialogParams Pattern Found at: %p\n", (uint64_t*)lpPattern);
+				}
+
+			}
+		}
+
+		if (SettingsMgr->pDialogCallback.empty())
+		{
+			printfError("pDialogCallback Not Specified. Please Add Pattern to ini file!");
+			return false;
+		}
+		lpPattern = SettingsMgr->pDialogCallback;
+		if (!lpPattern)
+		{
+			printfError("Couldn't find DialogCallback Pattern");
+			return false;
+		}
+
+		GetProcFromOpCode(lpPattern, 4, &MVSGame::SingleParamDialogCallbackSetter); // 0x1428AD240
+
+		if (SettingsMgr->iLogLevel)
+		{
+			printf("DialogCallback Pattern Found at: %p\n", (uint64_t*)lpPattern);
+			printf("DialogCallback at %p\n", MVSGame::SingleParamDialogCallbackSetter);
+		}
+
+
+		if (SettingsMgr->pQuitGameCallback.empty())
+		{
+			printfError("pQuitGameCallback Not Specified. Please Add Pattern to ini file!");
+			return false;
+		}
+		else
+		{
+			lpPattern = SettingsMgr->pQuitGameCallback;
+			if (!lpPattern)
+			{
+				printfWarning("Couldn't find pQuitGameCallback Pattern. Going with alternative Shutdown mechanism!");
+			}
+			else
+			{
+				MVSGame::QuitGame = (MVSGame::QuitGameParamsType*)(uint64_t*)lpPattern; // 0x1428AFCC0
+
+				if (SettingsMgr->iLogLevel)
+				{
+					printf("QuitGameCallback Pattern Found at: %p\n", (uint64_t*)lpPattern);
+					printf("QuitGameCallback at %p\n", MVSGame::QuitGame);
+				}
+			}
+		}
+
+		printfSuccess("Dialog Usable!");
+		return true;
+	}
+
+	bool HookUEFuncs(Trampoline* GameTramp)
+	{
+		printf("\n==UE Funcs==\n");
+		if (SettingsMgr->pFText.empty())
+		{
+			printfError("pFText Not Specified. Please Add Pattern to ini file!");
+			return false;
+		}
+		PatternFinder lpPattern = SettingsMgr->pFText;
+		if (!lpPattern)
+		{
+			printfError("Couldn't find FText Pattern");
+			return false;
+		}
+
+		PatternFinder first_address = lpPattern - (uint64_t)26;
+
+		// FText
+		GetProcFromOpCode(first_address + 14, 4, &FText::FromString); // 0x142AFE4C0
+		GetProcFromOpCode(lpPattern + 3, 4, &FText::FromName); // 0x142AFE350
+		GetProcFromOpCode((uint64_t)FText::FromString + 32, 4, &FText::GetEmpty); // 0x142AFE6D0
+
+		if (SettingsMgr->iLogLevel)
+		{
+			printf("FText Pattern Found at: %p\n", (uint64_t*)lpPattern);
+			printf("FText::FromString at: %p\n", FText::FromString);
+			printf("FText::FromName at: %p\n", FText::FromName);
+			printf("FText::GetEmpty at: %p\n", FText::GetEmpty);
+		}
+
+		// FName
+		GetProcFromOpCode(first_address, 4, &FName::ToStringPtr);
+
+		if (SettingsMgr->pCFName.empty())
+		{
+			printfError("pCFName Not Specified. Please Add Pattern to ini file!");
+			return false;
+		}
+		lpPattern = SettingsMgr->pCFName;
+		if (!lpPattern)
+		{
+			printfError("Couldn't find CFName Pattern");
+			return false;
+		}
+
+		if (SettingsMgr->iLogLevel)
+		{
+			printf("CFName Pattern Found at: %p\n", (uint64_t*)lpPattern);
+		}
+
+		GetProcFromOpCode(lpPattern + 79, 4, &FName::FNameCharConstructor); // 0x142BB5FC0
+
+		if (SettingsMgr->pWCFname.empty())
+		{
+			printfError("pWCFname Not Specified. Please Add Pattern to ini file!");
+			return false;
+		}
+		lpPattern = SettingsMgr->pWCFname;
+		if (!lpPattern)
+		{
+			printfError("Couldn't find WCFname Pattern");
+			return false;
+		}
+		if (SettingsMgr->iLogLevel)
+		{
+			printf("WCFname Pattern Found at: %p\n", (uint64_t*)lpPattern);
+		}
+		FName::FNameWCharConstructor = (FName::FNameConstructorWCharType)GetGameAddr(lpPattern - 32); // 0x142BB6120
+
+		if (SettingsMgr->iLogLevel)
+		{
+			printf("FName::ToString at: %p\n", FName::ToStringPtr);
+			printf("FName::FName(char*) at: %p\n", FName::FNameCharConstructor);
+			printf("FName::FName(wchar_t*) at: %p\n", FName::FNameWCharConstructor);
+		}
+
+		printfSuccess("All Required UE Funcs Found!");
+
+		return true;
+	}
 
 };
 

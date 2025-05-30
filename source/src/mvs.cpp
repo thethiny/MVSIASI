@@ -1,46 +1,96 @@
 #include "mvsiutils.h"
 #include "mvs.h"
 
+namespace MVSGame {
+	// Game Functions
+	GetEndpointKeyValueType*		GetEndpointKeyValue				= nullptr;
+	SetFStringValueType*			SetFStringValue					= nullptr;
+	FDateTimeType*					FDateTime						= nullptr;
+	InitThreadHeaderType*			Init_thread_header				= nullptr;
+	InitThreadFooterType*			Init_thread_footer				= nullptr;
+	DialogParamsType*				FMvsDialogParametersConst		= nullptr;
+	//AddDialogUtilType*				AddDialogUtil					= nullptr;
+	//AddDialogFrontType*				AddDialogFront					= nullptr;
+	UFighterGameInstanceConstType*	UFigherGameInstanceConst		= nullptr;
+	GetFrontendManagerType*			GetFrontendManager				= nullptr;
+	SingleParamDialogCallbackSetterType* SingleParamDialogCallbackSetter = nullptr;
+	QuitGameParamsType*				QuitGame						= nullptr;
+	// Game vars
+	uint64_t* kSunsetDate = nullptr;
+	FText* GLeave_Lobby_Prompt_Text = nullptr;
 
-// Game Functions
-MVSGame::GetEndpointKeyValueType*			MVSGame::GetEndpointKeyValue			= nullptr;
-MVSGame::SetFStringValueType*				MVSGame::SetFStringValue				= nullptr;
-MVSGame::FDateTimeType*						MVSGame::FDateTime						= nullptr;
-MVSGame::InitThreadHeaderType*				MVSGame::Init_thread_header				= nullptr;
-MVSGame::InitThreadFooterType*				MVSGame::Init_thread_footer				= nullptr;
-// Game vars
-uint64_t*									MVSGame::kSunsetDate					= nullptr;
+	uint64_t UMvsDialog::AssignCallbackToButton(TMulticastDelegateBase* Button, void* MainCallback, void* CleanupCallback)
+	{
+		uint64_t result;
+		MVSGame::UMvsDialog* self = this;
+		MVSGame::SingleParamDialogCallbackSetter(Button, &result, self, self);
 
-namespace MVSGame::FNameFunc {
-	inline uint16_t GetSize(FName& F)
-	{
-		return F.NameSize >> 6;
-	};
-	inline char* GetName(FName& F)
-	{
-		return F.Name;
-	}
-	void Print(FName& F)
-	{
-		uint16_t s = GetSize(F);
-		fwrite(F.Name, 1, s, stdout);
-		printf("\n");
-	}
-	char* ToStr(FName& F)
-	{
-		uint16_t s = GetSize(F);
-		char* name = new char[s + 1];
-		strncpy(name, F.Name, s);
-		name[s] = '\0'; // Null terminate
-		return name;
-	}
-	FName* FromStr(const char* string)
-	{
-		uint16_t length = (uint16_t)strlen(string);
-		FName* f = (FName*)(new uint8_t[length + 2]);
-		f->NameSize = (length << 6) + 0xC; // IDK where C comes from
-		strncpy(f->Name, string, length);
+		auto* Faker = new MVSGame::FakeVFTabler();
+		if (CleanupCallback)
+			Faker->AddFunction((void*)CleanupCallback, 0); // Slot 0: Cleanup
+		if (MainCallback)
+			Faker->AddFunction((void*)MainCallback, 10);   // Slot 10: Main
 
-		return f;
+		*Button->InvocationList.Data->DelegateAllocator = *(void**)Faker;
+
+		return result;
+	}
+}
+
+namespace MVSGame::Instances {
+	uint64_t*						ThisWidget						= nullptr;
+	MVSGame::UFighterGameInstance*	FighterGame						= nullptr;
+}
+
+namespace UE {
+	wchar_t* FString::GetStr()
+	{
+		return (wchar_t*)(&Data[0]);
+	}
+
+	FString* FName::ToString(FString* result)
+	{
+		return ToStringPtr(this, result);
+	}
+
+	FName::FName()
+	{
+		Index = -1;
+		Number = 0;
+	}
+
+	FName::FName(const char* Name)
+	{
+		FNameCharConstructor(this, Name, EFindName::FNAME_Add);
+	}
+
+	FName::FName(const wchar_t* Name)
+	{
+		FNameWCharConstructor(this, Name, EFindName::FNAME_Add);
+	}
+
+	FText::FText()
+	{
+		FText* Empty = GetEmpty();
+		TextData = Empty->TextData;
+		memcpy(Pad, Empty->Pad, sizeof(Empty->Pad));
+	}
+
+	FText::FText(const wchar_t* text)
+	{
+		FName name(text);
+		FText::FromName(this, &name);
+	}
+
+	FText::FText(const char* text)
+	{
+		FName name(text);
+		FText::FromName(this, &name);
+	}
+
+	FText::FText(const FText& other)
+	{
+		TextData = other.TextData;
+		memcpy(Pad, other.Pad, sizeof(Pad));
 	}
 }

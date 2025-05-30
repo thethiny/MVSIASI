@@ -5,7 +5,7 @@
 #include <tlhelp32.h> 
 #include <VersionHelpers.h>
 
-constexpr const char * CURRENT_HOOK_VERSION = "0.0.4b";
+constexpr const char * CURRENT_HOOK_VERSION = "0.1.0";
 
 Trampoline* GameTramp, * User32Tramp;
 
@@ -71,6 +71,14 @@ void PreGameHooks()
 	{
 		HookMetadata::sActiveMods.bSunsetDate			= MVSI::Hooks::PatchSunsetSetterIntoMVSIChecker(GameTramp);
 	}
+	if (SettingsMgr->bHookUE)
+	{
+		HookMetadata::sActiveMods.bUEFuncs				= MVSI::Hooks::HookUEFuncs(GameTramp);
+	}
+	if (SettingsMgr->bDialog)
+	{
+		HookMetadata::sActiveMods.bDialog				= MVSI::Hooks::DialogHooks(GameTramp);
+	}
 	
 }
 
@@ -121,6 +129,10 @@ inline bool VerifyProcessName(std::string expected_process) {
 		process_name[i] = std::tolower(process_name[i]);
 	}
 
+	for (size_t i = 0; i < expected_process.length(); ++i) {
+		expected_process[i] = std::tolower(expected_process[i]);
+	}
+
 	return (process_name == expected_process);
 }
 
@@ -130,14 +142,14 @@ bool OnInitializeHook()
 	FirstRunMgr->Init();
 	SettingsMgr->Init();
 
-	if (!HandleWindowsVersion())
-		return false;
-
-	if (!SettingsMgr->bAllowNonMK && !(VerifyProcessName("MultiVersus-Win64-Shipping.exe") || !VerifyProcessName("MultiVersus.exe") || !VerifyProcessName("MVSI.exe")))
+	if (!SettingsMgr->bAllowNonMK && !(VerifyProcessName("MultiVersus-Win64-Shipping.exe") || VerifyProcessName("MultiVersus.exe") || VerifyProcessName("MVSI.exe") || VerifyProcessName("iDev.exe")))
 	{
 		SpawnError("MVSI only works with the original MVS steam game!");
 		return false;
 	}
+
+	if (!HandleWindowsVersion())
+		return false;
 
 	if (SettingsMgr->bEnableConsoleWindow)
 	{
@@ -158,6 +170,10 @@ bool OnInitializeHook()
 	{
 		MessageBoxA(0, "Freezing Game Until OK", ":)", MB_ICONINFORMATION);
 	}
+
+	// Hash Exe
+	uint64_t EXEHash = HashTextSectionOfHost();
+	CachedPatternsMgr->Init(EXEHash, CURRENT_HOOK_VERSION);
 
 	ProcessSettings(); // Parse Settings
 	PreGameHooks(); // Queue Blocker
@@ -187,6 +203,7 @@ bool APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpRes)
 	case DLL_PROCESS_ATTACH:
 		printfInfo("On Attach Initialize");
 		OnInitializeHook();
+		break;
 	case DLL_THREAD_ATTACH:
 	case DLL_THREAD_DETACH:
 	case DLL_PROCESS_DETACH:

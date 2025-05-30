@@ -29,6 +29,8 @@ std::string		GetFileName(std::string filename);
 HMODULE			AwaitHModule(const char* name, uint64_t timeout = 0);
 uint64_t		stoui64h(std::string szString);
 uint64_t*		FindPattern(void* handle, std::string_view bytes);
+uint64_t*		FindPattern(std::string pattern);
+uint64_t*		FindPattern(const char* pattern);
 uint64_t		HookPattern(std::string Pattern, const char* PatternName, void* HookProc, int64_t PatternOffset = 0, PatchTypeEnum PatchType = PatchTypeEnum::PATCH_CALL, uint64_t PrePat = NULL, uint64_t* Entry = nullptr);
 uint64_t		GetDestinationFromOpCode(uint64_t Caller, uint64_t Offset = 1, uint64_t FuncLen = 5, uint16_t size = 4);
 int32_t			GetOffsetFromOpCode(uint64_t Caller, uint64_t Offset, uint16_t size);
@@ -44,6 +46,54 @@ bool			IsBase(char c, int = 16);
 uint64_t* MakeProxyFromOpCode(Trampoline* GameTramp, uint64_t CallAddr, uint8_t JumpAddrSize, void* ProxyFunctionAddr, PatchTypeEnum PatchType = PATCH_CALL);
 template <typename T> void MakeProxyFromOpCode(Trampoline* GameTramp, uint64_t CallAddr, uint8_t JumpAddrSize, void* ProxyFunctionAddr, T** ProxyFuncPtr, PatchTypeEnum PatchType = PATCH_CALL);
 
+class PatternFinder
+{
+private:
+	uint64_t address = 0;
+
+public:
+	PatternFinder() = default;
+	PatternFinder(const std::string pattern) { *this = pattern; }
+	operator uint64_t () { return address; }
+	operator uint64_t* () { return (uint64_t*)address; }
+	operator __int64() { return __int64(address);  }
+	operator bool() { return bool(address); }
+	PatternFinder& operator+=(const uint64_t b) { address += b; return *this; }
+	PatternFinder& operator=(const std::string pattern)
+	{
+		uint64_t returned = CachedPatternsMgr->Load((char*)pattern.c_str());
+
+		if (returned)
+			address = returned;
+		else
+		{
+			address = (uint64_t)FindPattern(pattern);
+			CachedPatternsMgr->Save((char*)pattern.c_str(), address);
+		}
+
+		return *this;
+	}
+	PatternFinder operator+(const int b) {
+		PatternFinder obj;
+		obj.address = this->address + b;
+		return obj;
+	}
+	PatternFinder operator-(const int b) {
+		PatternFinder obj;
+		obj.address = this->address - b;
+		return obj;
+	}
+	PatternFinder operator+(const uint64_t b) {
+		PatternFinder obj;
+		obj.address = this->address + b;
+		return obj;
+	}
+	PatternFinder operator-(const uint64_t b) {
+		PatternFinder obj;
+		obj.address = this->address - b;
+		return obj;
+	}
+};
 
 struct LibFuncStruct {
 	std::string FullName;
@@ -114,3 +164,5 @@ namespace RegisterHacks {
 	extern MoveToRegister*	MoveToR15;
 
 }
+
+uint64_t HashTextSectionOfHost();

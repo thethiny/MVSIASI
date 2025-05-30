@@ -22,6 +22,8 @@ public:
 	// Toggles
 	bool bSunsetDate;
 	bool bDisableSignatureCheck;
+	bool bHookUE;
+	bool bDialog;
 
 	// Addresses
 
@@ -30,6 +32,14 @@ public:
 	std::string pEndpointLoader;
 	std::string pProdEndpointLoader;
 	std::string pSunsetDate;
+	std::string pFText;
+	std::string pCFName;
+	std::string pWCFname;
+	std::string pDialog;
+	std::string pDialogParams;
+	std::string pFighterInstance;
+	std::string pDialogCallback;
+	std::string pQuitGameCallback;
 
 
 	// Menu Section
@@ -61,11 +71,27 @@ public:
 	void Save();
 
 public:
-	bool bPaidModWarned;
+	bool bPaidModWarned = false;
 
 private:
 	CIniReader* ini;
 };
 
-extern eSettingsManager* SettingsMgr;
-extern eFirstRunManager* FirstRunMgr;
+class eCachedPatternsManager
+{
+private:
+	char* Hash = nullptr;
+	CIniReader* ini;
+	static __int64 GameAddr;
+
+public:
+	void Init(uint64_t Hash, const char* version);
+	void Save(char *key, uint64_t offset);
+	uint64_t eCachedPatternsManager::Load(char* key);
+	
+	~eCachedPatternsManager() { if (Hash) delete[] Hash; }
+};
+
+extern eSettingsManager*		SettingsMgr;
+extern eFirstRunManager*		FirstRunMgr;
+extern eCachedPatternsManager*	CachedPatternsMgr;
