@@ -33,12 +33,8 @@ public:
 
 
 	// Menu Section
-	std::string hkCheats;
 	std::string hkMenu;
-	std::string hkInfo;
-	int iVKCheats;
 	int iVKMenuToggle;
-	int iVKMenuInfo;
 
 	//Other
 	int iLogSize;

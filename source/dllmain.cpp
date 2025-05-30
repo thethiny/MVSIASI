@@ -5,7 +5,7 @@
 #include <tlhelp32.h> 
 #include <VersionHelpers.h>
 
-constexpr const char * CURRENT_HOOK_VERSION = "0.0.4";
+constexpr const char * CURRENT_HOOK_VERSION = "0.0.4b";
 
 Trampoline* GameTramp, * User32Tramp;
 
@@ -77,9 +77,7 @@ void PreGameHooks()
 void ProcessSettings()
 {
 	// KeyBinds
-	SettingsMgr->iVKCheats				= StringToVK(SettingsMgr->hkCheats);
 	SettingsMgr->iVKMenuToggle			= StringToVK(SettingsMgr->hkMenu);
-	SettingsMgr->iVKMenuInfo			= StringToVK(SettingsMgr->hkInfo);
 
 	// DLL Procs
 	HookMetadata::sLFS.ModLoader		= ParseLibFunc(SettingsMgr->szModLoader);
