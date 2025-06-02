@@ -5,7 +5,8 @@
 #include <tlhelp32.h> 
 #include <VersionHelpers.h>
 
-constexpr const char * CURRENT_HOOK_VERSION = "0.1.0";
+constexpr const char * CURRENT_HOOK_VERSION = "0.1.1";
+const char* MVSI::MVSI_Version = (const char*)CURRENT_HOOK_VERSION;
 
 Trampoline* GameTramp, * User32Tramp;
 
@@ -21,6 +22,16 @@ LRESULT CALLBACK KeyboardProc(int code, WPARAM wParam, LPARAM lParam)
 {
 	bool state = lParam >> 31, transition = lParam & 0x40000000;
 	auto RepeatCount = LOWORD(lParam);
+
+	if (code >= 0 && !state)
+	{
+		if (GetAsyncKeyState(VK_F1))
+		{
+			printf("Attempting F1 action\n");
+			MVSI::ShowNotification("MVSI Loaded", CURRENT_HOOK_VERSION, 10.f, true);
+		}
+
+	}
 
 	return CallNextHookEx(0, code, wParam, lParam);
 }
@@ -79,6 +90,10 @@ void PreGameHooks()
 	{
 		HookMetadata::sActiveMods.bDialog				= MVSI::Hooks::DialogHooks(GameTramp);
 	}
+	if (SettingsMgr->bNotifs)
+	{
+		HookMetadata::sActiveMods.bNotifs = MVSI::Hooks::NotificationHooks(GameTramp);
+	}
 	
 }
 
@@ -136,6 +151,15 @@ inline bool VerifyProcessName(std::string expected_process) {
 	return (process_name == expected_process);
 }
 
+void InitializeKeyboard()
+{
+	HookMetadata::KeyboardProcHook = SetWindowsHookEx(
+		WH_KEYBOARD,
+		KeyboardProc,
+		HookMetadata::CurrentDllModule,
+		GetCurrentThreadId()
+	);
+}
 
 bool OnInitializeHook()
 {
@@ -198,11 +222,13 @@ static void OnShutdown()
 bool APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpRes)
 {
 	HookMetadata::CurrentDllModule = hModule;
+	HHOOK hook_ = nullptr;
 	switch (reason)
 	{
 	case DLL_PROCESS_ATTACH:
 		printfInfo("On Attach Initialize");
 		OnInitializeHook();
+		InitializeKeyboard();
 		break;
 	case DLL_THREAD_ATTACH:
 	case DLL_THREAD_DETACH:

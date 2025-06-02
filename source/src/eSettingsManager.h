@@ -24,6 +24,7 @@ public:
 	bool bDisableSignatureCheck;
 	bool bHookUE;
 	bool bDialog;
+	bool bNotifs;
 
 	// Addresses
 
@@ -40,6 +41,7 @@ public:
 	std::string pFighterInstance;
 	std::string pDialogCallback;
 	std::string pQuitGameCallback;
+	std::string	pNotifs;
 
 
 	// Menu Section

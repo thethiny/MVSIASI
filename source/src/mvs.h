@@ -156,7 +156,67 @@ namespace MVSGame { // Namespace for game functions / structs
 		DialogFocusButton						ButtonToFocus = DialogFocusButton();
 	};
 
+	enum class EMvsNotificationCategory : uint8_t {
+		None							= 0,
+		Social							= 1,
+		Reward							= 2,
+		System							= 3,
+		Matchmaking						= 4,
+		Toasts							= 5,
+		Debug							= 6,
+		MatchmakingErrors				= 7,
+		LobbyInvites					= 8,
+		EMvsNotificationCategory_MAX,
+	};
+
+
+	struct FMvsNotificationData
+	{
+		FText Text = FText();                                                            
+		FText Caption = FText();
+		uint8_t Icon[0x30]{0};
+		float TimeoutSeconds = 5.0;
+		uint32_t pad = 0;
+		uint8_t Action[0x10]{0};
+		FText ActionButtonText = FText();
+		uint64_t WidgetClass = 0;
+		EMvsNotificationCategory Category = EMvsNotificationCategory::None;
+		bool bAutoDismissWhenClicked = true;
+		uint8_t pad2[6]{ 0 };
+		uint64_t* UserData = nullptr;
+	};
+
 	class UFighterGameInstance;
+	class UMvsNotificationHandle;
+	class UMvsNotificationManager
+	{
+	public:
+
+		UMvsNotificationHandle* RequestShowNotification(const FMvsNotificationData* Data)
+		{
+			return RequestShowNotificationPtr(this, Data);
+		}
+
+		static UMvsNotificationManager* Get(const UFighterGameInstance* WorldContextObject)
+		{
+			return GetNotifManagerPtr(WorldContextObject);
+		}
+
+		UMvsNotificationManager(const UFighterGameInstance* WorldContextObject)
+		{
+			auto resp = GetNotifManagerPtr(WorldContextObject);
+			if (resp)
+				*this = *resp;
+		}
+
+		using RequestShowNotificationType = UMvsNotificationHandle * (__fastcall*)(UMvsNotificationManager* This, const FMvsNotificationData* Data);
+		static inline RequestShowNotificationType RequestShowNotificationPtr = nullptr;
+
+		using GetNotifManagerType = UMvsNotificationManager * (__fastcall*)(const UFighterGameInstance* WorldContextObject);
+		static inline GetNotifManagerType GetNotifManagerPtr = nullptr;
+
+	};
+
 	class UMvsDialog
 	{
 	private:
@@ -181,11 +241,26 @@ namespace MVSGame { // Namespace for game functions / structs
 
 	class UMvsFrontendManager
 	{
+	private:
+		uint8_t INHERITED[0x40]; // 0x00
+	public:
+		uint64_t* ScreenStack; // 0x40
+		uint64_t* ShopPageStack; // 0x48
+		uint64_t HoveredButton[10]; // 0x50
+		uint64_t OnSceneChangeRequested[2]; // 0xA0
+		TMulticastDelegateBase	NativeOnSceneChangeRequested; /// 0xB0
+		uint64_t* CurrentStateWidget; // 0xC8
+	private:
+		uint8_t RemainingItems[0x70];
 	public:
 		using AddDialogType = UMvsDialog * (__fastcall*)(UMvsFrontendManager*, FMvsDialogParameters*);
 		static inline AddDialogType AddDialogPtr = nullptr;
 
+		//using AddNotificationType = uint64_t * (__fastcall*)(UMvsFrontendManager*, FMvsNotificationData*);
+		//static inline AddNotificationType AddNotificationPtr = nullptr;
+
 		UMvsDialog* AddDialog(FMvsDialogParameters* Params) { return AddDialogPtr(this, Params); }
+		//uint64_t* AddNotification(FMvsNotificationData* Params) { return AddNotificationPtr(this, Params); }
 	};
 
 	class FakeVFTabler
