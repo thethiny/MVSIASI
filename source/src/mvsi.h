@@ -10,6 +10,7 @@ using namespace UE;
 namespace MVSI {
 
 	extern uint64_t EXEHash;
+	extern const char* MVSI_Version;
 
 	namespace Proxies {
 		//__int64									__fastcall	ReadFString(__int64, __int64);
@@ -28,12 +29,88 @@ namespace MVSI {
 		bool PatchSunsetSetterIntoMVSIChecker(Trampoline*);
 		bool DialogHooks(Trampoline*);
 		bool HookUEFuncs(Trampoline*);
+		bool NotificationHooks(Trampoline*);
 	};
 
 	extern bool IsMVSIUpdateRequired;
 
 	template<typename T>
 	MVSGame::UMvsDialog* ShowDialog(const T* promptText, const T* description = nullptr, const T* button1 = nullptr, const T* button2 = nullptr, const T* button3 = nullptr, const int selectedButton = -1, bool ShowExitButton = false, bool ShowSpinner = false, bool ShowSolidBackground = true, bool HideActionBar = false);
+
+	template<typename T>
+	MVSGame::UMvsNotificationManager* ShowNotification(const T* text = nullptr, const T* caption = nullptr, const float timeout = 5.0f, const bool bAutoDismissWhenClicked = true);
+
+	template<typename T>
+	MVSGame::UMvsNotificationManager* ShowNotification(const T* text, const T* caption, const float timeout, const bool bAutoDismissWhenClicked)
+	{
+		using namespace MVSGame;
+
+		UMvsNotificationManager* manager = UMvsNotificationManager::Get(Instances::FighterGame);
+		if (!manager)
+			return nullptr;
+
+		MVSGame::FMvsNotificationData params;
+
+		if (text)
+			params.Text = FText(text);
+		if (caption)
+			params.Caption = FText(caption);
+		//if (actionText)
+			//params.ActionButtonText = FText(actionText);
+
+		params.TimeoutSeconds = timeout;
+		params.bAutoDismissWhenClicked = bAutoDismissWhenClicked;
+
+		params.Category = MVSGame::EMvsNotificationCategory::None;
+
+		manager->RequestShowNotification(&params);
+		return manager;
+	}
+
+	template<typename T>
+	MVSGame::UMvsDialog* ShowDialog(
+		const T* promptText, const T* description, const T* button1, const T* button2, const T* button3, const int selectedButton,
+		bool ShowExitButton, bool ShowSpinner, bool ShowSolidBackground, bool HideActionBar
+	)
+	{
+		using namespace MVSGame;
+
+		UMvsFrontendManager* frontend = GetFrontendManager(Instances::FighterGame);
+		if (!frontend || !frontend->CurrentStateWidget)
+			return nullptr;
+
+		FMvsDialogParameters DialogParameters;
+		DialogParameters.PromptText = FText(promptText);
+
+		if (description)
+			DialogParameters.PromptDescriptionText = FText(description);
+
+		if (button1)
+			DialogParameters.ButtonOneText = FText(button1);
+
+		if (button2)
+			DialogParameters.ButtonTwoText = FText(button2);
+
+		if (button3)
+			DialogParameters.ButtonThreeText = FText(button3);
+
+		if (selectedButton != -1)
+		{
+			DialogParameters.ButtonToFocus.Value = selectedButton;
+			DialogParameters.ButtonToFocus.bIsSet = true;
+		}
+		else
+		{
+			DialogParameters.ButtonToFocus.bIsSet = false;
+		}
+
+		DialogParameters.bShowExitButton = ShowExitButton;
+		DialogParameters.bShowSpinner = ShowSpinner;
+		DialogParameters.bShowSolidBackground = ShowSolidBackground;
+		DialogParameters.bHideActionBar = HideActionBar;
+
+		return frontend->AddDialog(&DialogParameters);
+	}
 }
 
 namespace HookMetadata { //Namespace for helpers for game functions
@@ -44,6 +121,7 @@ namespace HookMetadata { //Namespace for helpers for game functions
 		bool bSunsetDate		= false;
 		bool bUEFuncs			= false;
 		bool bDialog			= false;
+		bool bNotifs			= false;
 	};
 
 	struct LibMapsStruct {

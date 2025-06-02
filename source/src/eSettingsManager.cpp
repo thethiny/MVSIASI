@@ -82,6 +82,7 @@ void eSettingsManager::Init()
 	// Features
 	bHookUE						= ini.ReadBoolean	("Features",			"HookUE",					true);
 	bDialog						= ini.ReadBoolean	("Features",			"Dialog",					true);
+	bNotifs						= ini.ReadBoolean	("Features",			"Notifications",			true);
 
 	// Patterns
 	pSigCheck					= ini.ReadString	("Patterns",			"SigCheck",					"");
@@ -97,6 +98,7 @@ void eSettingsManager::Init()
 	pDialogCallback				= ini.ReadString	("Patterns.MVS",		"DialogCallback",			"");
 	pQuitGameCallback			= ini.ReadString	("Patterns.MVS",		"QuitGameCallback",			"");
 	pFighterInstance			= ini.ReadString	("Patterns.MVS",		"FighterInstance",			"");
+	pNotifs						= ini.ReadString	("Patterns.MVS",		"Notifications",			"");
 	
 
 	// Private Server

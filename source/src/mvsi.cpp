@@ -5,51 +5,6 @@ HookMetadata::ActiveMods			HookMetadata::sActiveMods;
 HookMetadata::LibMapsStruct			HookMetadata::sLFS;
 bool MVSI::IsMVSIUpdateRequired = false;
 
-template<typename T>
-MVSGame::UMvsDialog* MVSI::ShowDialog(
-		const T* promptText, const T* description, const T* button1, const T* button2, const T* button3, const int selectedButton,
-		bool ShowExitButton, bool ShowSpinner, bool ShowSolidBackground, bool HideActionBar
-	)
-{
-	using namespace MVSGame;
-
-	UMvsFrontendManager* frontend = GetFrontendManager(Instances::FighterGame);
-	if (!frontend || !*(uint64_t*)((uint64_t)frontend + 0xC8)) // C8 = CurrentStateWidget
-		return nullptr;
-
-	FMvsDialogParameters DialogParameters;
-	DialogParameters.PromptText = FText(promptText);
-
-	if (description)
-		DialogParameters.PromptDescriptionText = FText(description);
-
-	if (button1)
-		DialogParameters.ButtonOneText = FText(button1);
-
-	if (button2)
-		DialogParameters.ButtonTwoText = FText(button2);
-
-	if (button3)
-		DialogParameters.ButtonThreeText = FText(button3);
-
-	if (selectedButton != -1)
-	{
-		DialogParameters.ButtonToFocus.Value = selectedButton;
-		DialogParameters.ButtonToFocus.bIsSet = true;
-	}
-	else
-	{
-		DialogParameters.ButtonToFocus.bIsSet = false;
-	}
-
-	DialogParameters.bShowExitButton = ShowExitButton;
-	DialogParameters.bShowSpinner = ShowSpinner;
-	DialogParameters.bShowSolidBackground = ShowSolidBackground;
-	DialogParameters.bHideActionBar = HideActionBar;
-
-	return frontend->AddDialog(&DialogParameters);
-}
-
 namespace MVSI::Proxies {
 
 	HANDLE __stdcall CreateFile(LPCWSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes, HANDLE hTemplateFile)
@@ -96,12 +51,18 @@ namespace MVSI::Proxies {
 		FirstRunMgr->Save();
 	}
 
+	void OfflineModeWarning()
+	{
+		ShowNotification("Update Required", "Offline mode activated", 10.f);
+	}
+
 	bool MVSIOfflineModeChecker(int32_t* _TSS0_395)
 	{
 		static bool isUpdateWarned = !SettingsMgr->bDebug; // Only for debug now
 		static bool isPaidWarnShown = FirstRunMgr->bPaidModWarned;
+		static bool isVersionShown = false;
 		MVSGame::Init_thread_header(_TSS0_395);
-		if (_TSS0_395[0] == -1) // This portion will only be called once
+		if (_TSS0_395[0] == -1) // This segment will only be called once
 		{
 			// Check for updates
 
@@ -122,7 +83,13 @@ namespace MVSI::Proxies {
 				uint64_t resultYes = dialog->AssignCallbackToButton(&dialog->OnButtonOneClicked, &SaveModWarningState);
 
 				isPaidWarnShown = true;
-			}			
+			}
+		}
+
+		if (!isVersionShown && MVSGame::Instances::FighterGame)
+		{
+			if (ShowNotification((const char*)"MVSI Loaded", MVSI_Version, 10.f))
+				isVersionShown = true;
 		}
 
 		if (!isUpdateWarned && MVSGame::Instances::FighterGame)
@@ -131,7 +98,7 @@ namespace MVSI::Proxies {
 			if (dialog)
 			{
 				uint64_t resultYes = dialog->AssignCallbackToButton(&dialog->OnButtonOneClicked, MVSGame::QuitGame); // Change to the update one
-				uint64_t resultNo = dialog->AssignCallbackToButton(&dialog->OnButtonTwoClicked); // Create function to disable internet or simply refuse connections from the server.
+				uint64_t resultNo = dialog->AssignCallbackToButton(&dialog->OnButtonTwoClicked, &OfflineModeWarning); // Create function to disable internet or simply refuse connections from the server.
 				isUpdateWarned = true;
 			}
 		}
@@ -467,26 +434,7 @@ namespace MVSI::Hooks {
 			return false;
 		}
 
-		if (SettingsMgr->pFighterInstance.empty())
-		{
-			printfError("pFighterInstance Not Specified. Please Add Pattern to ini file!");
-			return false;
-		}
-		PatternFinder lpPattern = SettingsMgr->pFighterInstance;
-		if (!lpPattern)
-		{
-			printfError("Couldn't find FighterInstance Pattern");
-			return false;
-		}
-
-		uint64_t address = GetDestinationFromOpCode(lpPattern, 3, 7, 4); // Couldn't get inside cuz too small, so get outside's lea, go inside, offset.
-		MakeProxyFromOpCode(GameTramp, address + 14, 4, MVSI::Proxies::CopyFighterInstance, &MVSGame::UFigherGameInstanceConst, PATCH_JUMP); // 0x1422943BE
-
-		if (SettingsMgr->iLogLevel)
-		{
-			printf("FighterInstance Pattern Found at: %p\n", (uint64_t*)lpPattern);
-			printf("FighterInstance Proxied from %p to %p\n", MVSGame::UFigherGameInstanceConst, MVSI::Proxies::CopyFighterInstance);
-		}
+		PatternFinder lpPattern;
 
 		if (SettingsMgr->pDialog.empty())
 		{
@@ -575,6 +523,48 @@ namespace MVSI::Hooks {
 		return true;
 	}
 
+	bool NotificationHooks(Trampoline* GameTramp)
+	{
+		MVSGame::UMvsNotificationManager::GetNotifManagerPtr = (MVSGame::UMvsNotificationManager::GetNotifManagerType)GetGameAddr(0x1428B1D60);
+
+		printf("\n==Notification Funcs==\n");
+		if (!HookMetadata::sActiveMods.bUEFuncs)
+		{
+			printfError("UE Funcs were not enabled therefore Notifications cannot be used!");
+			return false;
+		}
+		
+		PatternFinder lpPattern;
+
+		if (SettingsMgr->pNotifs.empty())
+		{
+			printfError("pNotifs Not Specified. Please Add Pattern to ini file!");
+			return false;
+		}
+		lpPattern = SettingsMgr->pNotifs; // This pattern finds 3 functions, but all of them are the exact same so any works
+		if (!lpPattern)
+		{
+			printfError("Couldn't find Notifications Pattern");
+			return false;
+		}
+
+		//MVSGame::UMvsNotificationManager::RequestShowNotificationPtr = (MVSGame::UMvsNotificationManager::RequestShowNotificationType)(uint64_t*)(lpPattern + 32); // 0x142995E40 // 32
+		GetProcFromOpCode(lpPattern + 32, 4, &MVSGame::UMvsNotificationManager::RequestShowNotificationPtr);
+		//MVSGame::UMvsNotificationManager::GetNotifManagerPtr = (MVSGame::UMvsNotificationManager::GetNotifManagerType)GetGameAddr(0x1428B1D60); // 0x1428B1D60 // 19
+		GetProcFromOpCode(lpPattern + 19, 4, &MVSGame::UMvsNotificationManager::GetNotifManagerPtr); // 0x1428B1D60
+
+		if (SettingsMgr->iLogLevel)
+		{
+			printf("Notifications Pattern Found at: %p\n", (uint64_t*)lpPattern);
+			printf("ShowNotification at %p\n", MVSGame::UMvsNotificationManager::RequestShowNotificationPtr);
+			printf("NotificationManager at %p\n", MVSGame::UMvsNotificationManager::GetNotifManagerPtr);
+		}
+
+
+		printfSuccess("Notifications Usable!");
+		return true;
+	}
+
 	bool HookUEFuncs(Trampoline* GameTramp)
 	{
 		printf("\n==UE Funcs==\n");
@@ -649,6 +639,27 @@ namespace MVSI::Hooks {
 			printf("FName::ToString at: %p\n", FName::ToStringPtr);
 			printf("FName::FName(char*) at: %p\n", FName::FNameCharConstructor);
 			printf("FName::FName(wchar_t*) at: %p\n", FName::FNameWCharConstructor);
+		}
+
+		if (SettingsMgr->pFighterInstance.empty())
+		{
+			printfError("pFighterInstance Not Specified. Please Add Pattern to ini file!");
+			return false;
+		}
+		lpPattern = SettingsMgr->pFighterInstance;
+		if (!lpPattern)
+		{
+			printfError("Couldn't find FighterInstance Pattern");
+			return false;
+		}
+
+		uint64_t address = GetDestinationFromOpCode(lpPattern, 3, 7, 4); // Couldn't get inside cuz too small, so get outside's lea, go inside, offset.
+		MakeProxyFromOpCode(GameTramp, address + 14, 4, MVSI::Proxies::CopyFighterInstance, &MVSGame::UFigherGameInstanceConst, PATCH_JUMP); // 0x1422943BE
+
+		if (SettingsMgr->iLogLevel)
+		{
+			printf("FighterInstance Pattern Found at: %p\n", (uint64_t*)lpPattern);
+			printf("FighterInstance Proxied from %p to %p\n", MVSGame::UFigherGameInstanceConst, MVSI::Proxies::CopyFighterInstance);
 		}
 
 		printfSuccess("All Required UE Funcs Found!");
